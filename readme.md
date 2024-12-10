@@ -336,10 +336,10 @@
 
                 // Call Stable Diffusion API
                 // const response = await fetch('https://api.stability.ai/v1/generation/stable-diffusion-xl-1024-v1-0/text-to-image', {
-                    const response = await fetch('https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-dev', {
+                    const response = await fetch('https://api-inference.huggingface.co/models/prompthero/openjourney-v4', {
                     method: 'POST',
                     headers: {
-                        'Authorization': "Bearer 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",
+                        'Authorization': "Bearer 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",
                         'Content-Type': 'application/json',
                     },
                     body: JSON.stringify({
@@ -472,14 +472,11 @@
                 };
 
                 try {
-                    // Send the transaction
                     const userOpResponse = await smartWallet.sendTransaction(tx, {
                         paymasterServiceData: {
                             mode: PaymasterMode.SPONSORED
                         }
                     });
-                    console.log("userOpResponse are : ", userOpResponse);
-                    console.log("userOpResponse.hash are : ", userOpResponse.hash);
 
                     document.getElementById('statusText').textContent = 'Minting in progress...';
                     document.getElementById('transactionHash').innerHTML = `
@@ -487,78 +484,49 @@
                         target="_blank" class="underline">${userOpResponse.hash}</a>
                     `;
 
-                    // Function to poll for receipt
-                    const getReceipt = async (hash, attempts = 0) => {
-                        try {
-                            if (attempts > 20) { // Max 20 attempts (100 seconds total)
-                                throw new Error('Transaction taking too long to confirm');
-                            }
+                    // Add timeout handling for receipt
+                    const receipt = await Promise.race([
+                        userOpResponse.wait(),
+                        new Promise((_, reject) => 
+                            setTimeout(() => reject(new Error('Transaction confirmation timeout')), 60000)
+                        )
+                    ]);
 
-                            const receipt = await provider.getTransactionReceipt(userOpResponse.hash);
-                            if (receipt) {
-                                return receipt;
-                            }
-
-                            // Wait 5 seconds before next attempt
-                            await new Promise(resolve => setTimeout(resolve, 5000));
-                            return getReceipt(hash, attempts + 1);
-                        } catch (error) {
-                            console.error('Error getting receipt:', error);
-                            throw error;
-                        }
-                    };
-
-                    // Poll for receipt with status updates
-                    document.getElementById('statusText').innerHTML = `
-                        <div class="text-blue-600">
-                            ⏳ Waiting for transaction confirmation...<br>
-                            This may take a few minutes.
-                        </div>
-                    `;
-
-                    try {
-                        const receipt = await getReceipt(userOpResponse.hash);
-                        console.log("Transaction receipt:", receipt);
-
-                        if (receipt.status === 1) {
-                            document.getElementById('statusText').innerHTML = `
-                                <div class="text-green-600">
-                                    ✅ NFT Minted Successfully!<br>
-                                    Name: ${name}<br>
-                                    Price: ${price} ETH<br>
-                                    ${collaborator ? `Collaborator: ${collaborator} (${royalty}%)` : ''}
-                                </div>
-                            `;
-
-                            // Add link to view NFT
-                            document.getElementById('transactionHash').innerHTML += `
-                                <br>View your NFT on: <a href="https://nft.avax.network/collection/${CONFIG.nftContractAddress}" 
-                                target="_blank" class="underline">Avalanche NFT Marketplace</a>
-                            `;
-                        } else {
-                            throw new Error('Transaction failed');
-                        }
-                    } catch (receiptError) {
-                        // Handle timeout or receipt fetch error
+                    if (receipt.success) {
                         document.getElementById('statusText').innerHTML = `
-                            <div class="text-yellow-600">
-                                ⚠️ Transaction submitted but confirmation status unknown.<br>
-                                You can check the status using the transaction hash above.<br>
-                                <small>This doesn't necessarily mean the transaction failed.</small>
+                            <div class="text-green-600">
+                                ✅ NFT Minted Successfully!<br>
+                                Name: ${name}<br>
+                                Price: ${price} ETH<br>
+                                ${collaborator ? `Collaborator: ${collaborator} (${royalty}%)` : ''}
                             </div>
                         `;
-                    }
 
+                        // Add link to view NFT
+                        document.getElementById('transactionHash').innerHTML += `
+                            <br>View your NFT on: <a href="https://nft.avax.network/collection/${CONFIG.nftContractAddress}" 
+                            target="_blank" class="underline">Avalanche NFT Marketplace</a>
+                        `;
+                    } else {
+                        throw new Error('Transaction failed');
+                    }
                 } catch (txError) {
-                    console.error('Transaction error:', txError);
-                    throw new Error(`Transaction failed: ${txError.message}`);
+                    if (txError.message.includes('timeout')) {
+                        document.getElementById('statusText').innerHTML = `
+                            <div class="text-yellow-600">
+                                ⚠️ Transaction submitted but confirmation is taking longer than expected.<br>
+                                You can check the status later using the transaction hash.
+                            </div>
+                        `;
+                    } else {
+                        throw txError;
+                    }
                 }
 
                 mintBtn.disabled = false;
             } catch (error) {
                 console.error("Minting error:", error);
-                document.getElementById('statusText').innerHTML = `
-                    <div class="text-red-600">
+                document.getElementById('statusText').innerHTML = `<div class="text-red-600">
                         ❌ Error: ${error.message}
                     </div>
                 `;
