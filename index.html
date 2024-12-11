@@ -202,12 +202,12 @@
                     <textarea id="promptInput" placeholder="Describe your NFT artwork in detail..." class="input-field"
                         rows="4"></textarea>
                     <select id="styleSelect" class="input-field">
-                        <option value="realistic">Realistic Photography</option>
-                        <option value="abstract">Abstract Art</option>
-                        <option value="digital">Digital Art</option>
-                        <option value="3d">3D Render</option>
-                        <option value="pixel">Pixel Art</option>
-                        <option value="cartoon">Cartoon Style</option>
+                        <option value="realistic">Realistic</option>
+                        <option value="enhance">Enhanced</option>
+                        <option value="anime">Anime</option>
+                        <option value="photographic">Photographic</option>
+                        <option value="digital-art">Digital Art</option>
+                        <option value="comic-book">Comic Book</option>
                     </select>
                     <button onclick="generateArtwork()" id="generateBtn" class="btn-primary w-full">
                         Generate Artwork
@@ -438,28 +438,48 @@
 
                 // Call Stable Diffusion API
                 // const response = await fetch('https://api.stability.ai/v1/generation/stable-diffusion-xl-1024-v1-0/text-to-image', {
-                const response = await fetch('https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-dev', {
+                // const response = await fetch('https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-dev', {
+                const response = await fetch('https://api.stability.ai/v1/generation/stable-diffusion-xl-1024-v1-0/text-to-image', {
                     method: 'POST',
                     headers: {
-                        'Authorization': "Bearer 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",
+                        'Authorization': "Bearer sk-QhFQ7FeqUoebAzzAw1a9DdKN82UrFLSCv9PPrrGwT1rZ70mb",
                         'Content-Type': 'application/json',
+                        'Accept': 'application/json'
                     },
                     body: JSON.stringify({
-                        "inputs": formattedPrompt
+                        "text_prompts": [
+                            {
+                                "text": formattedPrompt,
+                                "weight": 1
+                            }
+                        ],
+                        "cfg_scale": 7,
+                        "height": 1024,
+                        "width": 1024,
+                        "samples": 1,
+                        "steps": 30,
+                        "style_preset": style.toLowerCase()
                     })
                 });
                 console.log("respose are : ", response);
 
                 if (!response.ok) {
-                    throw new Error(`Generation failed: ${response.statusText}`);
+                    const error = await response.json();
+                    throw new Error(error.message || 'Failed to generate image');
                 }
-
-                const blob = await response.blob();
-                const imageUrl = URL.createObjectURL(blob);
+                
+                // const blob = await response.blob();
+                // const imageUrl = URL.createObjectURL(blob);
+                const result = await response.json();
+                
+                // Stability AI returns base64 image data
+                const image = result.artifacts[0];
+                const imageUrl = `data:image/png;base64,${image.base64}`;
 
                 // Update the preview image
                 const imageElement = document.getElementById('artworkPreview');
                 imageElement.src = imageUrl;
+                imageElement.setAttribute('data-image-id', image.id); // Store image ID for reference
 
                 // Get AI-recommended price based on style and complexity
                 const recommendedPrice = await getRecommendedPrice();
@@ -480,12 +500,12 @@
         // Helper function to format prompts based on style
         function formatPrompt(prompt, style) {
             const stylePrompts = {
-                'realistic': `ultra realistic photograph, professional photography, ${prompt}, 8k uhd, high detail`,
-                'abstract': `abstract art style, modern art, ${prompt}, vibrant colors, artistic expression`,
-                'digital': `digital art, concept art, ${prompt}, detailed, vibrant, high resolution`,
-                '3d': `3D rendered art, octane render, ${prompt}, high detail, realistic lighting`,
-                'pixel': `pixel art style, 16-bit, ${prompt}, retro gaming aesthetic`,
-                'cartoon': `cartoon style, illustration, ${prompt}, vibrant colors, clean lines`
+                'realistic': `${prompt}, ultra realistic photograph, professional photography, 8k uhd, high detail`,
+                'enhance': `${prompt}, enhanced, artistic, professional quality`,
+                'anime': `${prompt}, anime style, manga art`,
+                'photographic': `${prompt}, professional photography, high resolution`,
+                'digital-art': `${prompt}, digital art, concept art, detailed, vibrant`,
+                'comic-book': `${prompt}, comic book style, illustrated, vibrant colors`
             };
 
             return stylePrompts[style.toLowerCase()] || prompt;

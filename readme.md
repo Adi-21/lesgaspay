@@ -94,14 +94,77 @@
             align-items: center;
             border-radius: 8px;
         }
+
+        #telegram-login {
+            display: flex;
+            align-items: center;
+        }
+
+        #telegram-login iframe {
+            margin: 0;
+        }
     </style>
+    <script>
+        // Define Telegram auth functions globally
+        window.onTelegramAuth = function(user) {
+            console.log('Telegram user:', user);
+            window.telegramUser = user;
+            
+            // Store Telegram user data
+            localStorage.setItem('telegramUser', JSON.stringify(user));
+            
+            // Enable wallet setup buttons
+            document.getElementById('createWalletBtn').disabled = false;
+            document.getElementById('importWalletBtn').disabled = false;
+            
+            // Update UI to show logged-in user
+            updateLoginStatus(user);
+        }
+
+        function updateLoginStatus(user) {
+            const walletInfo = document.getElementById('walletInfo');
+            if (user) {
+                walletInfo.innerHTML = `
+                    <div class="flex items-center gap-2">
+                        <img src="${user.photo_url}" alt="${user.first_name}" 
+                            class="w-8 h-8 rounded-full">
+                        <span>${user.first_name}</span>
+                    </div>
+                `;
+            }
+        }
+
+        // Check for existing Telegram login on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            const savedUser = localStorage.getItem('telegramUser');
+            if (savedUser) {
+                window.telegramUser = JSON.parse(savedUser);
+                updateLoginStatus(window.telegramUser);
+            } else {
+                // Disable wallet buttons until logged in
+                document.getElementById('createWalletBtn').disabled = true;
+                document.getElementById('importWalletBtn').disabled = true;
+            }
+        });
+    </script>
 </head>
 
 <body class="min-h-screen pb-8">
     <nav class="gradient-bg text-white p-4 mb-8">
         <div class="container mx-auto flex justify-between items-center">
             <h1 class="text-2xl font-bold">AI NFT Creator</h1>
-            <div id="walletInfo" class="text-sm"></div>
+            <div class="flex items-center gap-4">
+                <div id="walletInfo" class="text-sm"></div>
+                <!-- Telegram Login Widget -->
+                <div id="telegram-login">
+                    <script async src="https://telegram.org/js/telegram-widget.js?22"
+                        data-telegram-login="cheesecakeverify_bot"
+                        data-size="medium"
+                        data-onauth="onTelegramAuth(user)"
+                        data-request-access="write">
+                    </script>
+                </div>
+            </div>
         </div>
     </nav>
 
@@ -212,6 +275,7 @@
         let smartWallet;
         let provider;
         let wallet;
+        let telegramUser = null;
 
         // Initialize event listeners
         document.addEventListener('DOMContentLoaded', () => {
@@ -224,6 +288,12 @@
 
         window.createNewWallet = async function () {
             try {
+                // Check for Telegram authentication
+                console.log("window.telegramUser are : ", window.telegramUser);
+                if (!window.telegramUser) {
+                    throw new Error('Please login with Telegram first');
+                }
+
                 const createWalletBtn = document.getElementById('createWalletBtn');
                 const importWalletBtn = document.getElementById('importWalletBtn');
                 const setupBtn = document.getElementById('setupBtn');
@@ -253,22 +323,38 @@
         };
 
         window.importWallet = function () {
-            const privateKeyInput = document.getElementById('privateKey');
-            privateKeyInput.style.display = privateKeyInput.style.display === 'none' ? 'block' : 'none';
-            if (privateKeyInput.style.display === 'block') {
-                privateKeyInput.focus();
+            // Check for Telegram authentication
+            if (!window.telegramUser) {
+                alert('Please login with Telegram first');
+                return;
             }
+
+            // Show/hide input field without blocking UI
+            requestAnimationFrame(() => {
+                const privateKeyInput = document.getElementById('privateKey');
+                privateKeyInput.style.display = privateKeyInput.style.display === 'none' ? 'block' : 'none';
+                if (privateKeyInput.style.display === 'block') {
+                    privateKeyInput.focus();
+                }
+            });
         };
 
         async function importWalletFromKey(privateKey) {
             try {
+                // Show loading state
+                const importBtn = document.getElementById('importWalletBtn');
+                importBtn.disabled = true;
+                importBtn.textContent = 'Importing...';
+
                 if (!privateKey.startsWith('0x')) {
                     throw new Error('Private key must start with 0x');
                 }
 
+                // Create provider and wallet asynchronously
                 provider = new ethers.providers.JsonRpcProvider(CONFIG.rpcUrl);
                 wallet = new ethers.Wallet(privateKey, provider);
 
+                // Update UI after wallet creation
                 document.getElementById('walletDetails').innerHTML = `
                     <div class="p-4 bg-green-50 rounded-lg">
                         <p><strong>EOA Address:</strong> ${wallet.address}</p>
@@ -278,10 +364,26 @@
                 document.getElementById('setupBtn').disabled = false;
                 document.getElementById('privateKey').style.display = 'none';
                 document.getElementById('mintBtn').disabled = false;
+
             } catch (error) {
                 alert(`Error importing wallet: ${error.message}`);
+            } finally {
+                // Reset button state
+                importBtn.disabled = false;
+                importBtn.textContent = 'Import Wallet';
             }
         }
+
+        // Add debounce to private key input
+        let importTimeout;
+        document.getElementById('privateKey').addEventListener('input', (e) => {
+            clearTimeout(importTimeout);
+            importTimeout = setTimeout(() => {
+                if (e.target.value && e.target.value.length >= 66) { // Valid private key length
+                    importWalletFromKey(e.target.value);
+                }
+            }, 500);
+        });
 
         window.setupSmartAccount = async function () {
             try {
@@ -336,10 +438,10 @@
 
                 // Call Stable Diffusion API
                 // const response = await fetch('https://api.stability.ai/v1/generation/stable-diffusion-xl-1024-v1-0/text-to-image', {
-                    const response = await fetch('https://api-inference.huggingface.co/models/prompthero/openjourney-v4', {
+                const response = await fetch('https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-dev', {
                     method: 'POST',
                     headers: {
-                        'Authorization': "Bearer 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",
+                        'Authorization': "Bearer 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",
                         'Content-Type': 'application/json',
                     },
                     body: JSON.stringify({
@@ -472,11 +574,14 @@
                 };
 
                 try {
+                    // Send the transaction
                     const userOpResponse = await smartWallet.sendTransaction(tx, {
                         paymasterServiceData: {
                             mode: PaymasterMode.SPONSORED
                         }
                     });
+                    console.log("userOpResponse are : ", userOpResponse);
+                    console.log("userOpResponse.hash are : ", userOpResponse.hash);
 
                     document.getElementById('statusText').textContent = 'Minting in progress...';
                     document.getElementById('transactionHash').innerHTML = `
@@ -484,49 +589,78 @@
                         target="_blank" class="underline">${userOpResponse.hash}</a>
                     `;
 
-                    // Add timeout handling for receipt
-                    const receipt = await Promise.race([
-                        userOpResponse.wait(),
-                        new Promise((_, reject) => 
-                            setTimeout(() => reject(new Error('Transaction confirmation timeout')), 60000)
-                        )
-                    ]);
+                    // Function to poll for receipt
+                    const getReceipt = async (hash, attempts = 0) => {
+                        try {
+                            if (attempts > 20) { // Max 20 attempts (100 seconds total)
+                                throw new Error('Transaction taking too long to confirm');
+                            }
 
-                    if (receipt.success) {
-                        document.getElementById('statusText').innerHTML = `
-                            <div class="text-green-600">
-                                ✅ NFT Minted Successfully!<br>
-                                Name: ${name}<br>
-                                Price: ${price} ETH<br>
-                                ${collaborator ? `Collaborator: ${collaborator} (${royalty}%)` : ''}
-                            </div>
-                        `;
+                            const receipt = await provider.getTransactionReceipt(userOpResponse.hash);
+                            if (receipt) {
+                                return receipt;
+                            }
 
-                        // Add link to view NFT
-                        document.getElementById('transactionHash').innerHTML += `
-                            <br>View your NFT on: <a href="https://nft.avax.network/collection/${CONFIG.nftContractAddress}" 
-                            target="_blank" class="underline">Avalanche NFT Marketplace</a>
-                        `;
-                    } else {
-                        throw new Error('Transaction failed');
-                    }
-                } catch (txError) {
-                    if (txError.message.includes('timeout')) {
+                            // Wait 5 seconds before next attempt
+                            await new Promise(resolve => setTimeout(resolve, 5000));
+                            return getReceipt(hash, attempts + 1);
+                        } catch (error) {
+                            console.error('Error getting receipt:', error);
+                            throw error;
+                        }
+                    };
+
+                    // Poll for receipt with status updates
+                    document.getElementById('statusText').innerHTML = `
+                        <div class="text-blue-600">
+                            ⏳ Waiting for transaction confirmation...<br>
+                            This may take a few minutes.
+                        </div>
+                    `;
+
+                    try {
+                        const receipt = await getReceipt(userOpResponse.hash);
+                        console.log("Transaction receipt:", receipt);
+
+                        if (receipt.status === 1) {
+                            document.getElementById('statusText').innerHTML = `
+                                <div class="text-green-600">
+                                    ✅ NFT Minted Successfully!<br>
+                                    Name: ${name}<br>
+                                    Price: ${price} ETH<br>
+                                    ${collaborator ? `Collaborator: ${collaborator} (${royalty}%)` : ''}
+                                </div>
+                            `;
+
+                            // Add link to view NFT
+                            document.getElementById('transactionHash').innerHTML += `
+                                <br>View your NFT on: <a href="https://nft.avax.network/collection/${CONFIG.nftContractAddress}" 
+                                target="_blank" class="underline">Avalanche NFT Marketplace</a>
+                            `;
+                        } else {
+                            throw new Error('Transaction failed');
+                        }
+                    } catch (receiptError) {
+                        // Handle timeout or receipt fetch error
                         document.getElementById('statusText').innerHTML = `
                             <div class="text-yellow-600">
-                                ⚠️ Transaction submitted but confirmation is taking longer than expected.<br>
-                                You can check the status later using the transaction hash.
+                                ⚠️ Transaction submitted but confirmation status unknown.<br>
+                                You can check the status using the transaction hash above.<br>
+                                <small>This doesn't necessarily mean the transaction failed.</small>
                             </div>
                         `;
-                    } else {
-                        throw txError;
                     }
+
+                } catch (txError) {
+                    console.error('Transaction error:', txError);
+                    throw new Error(`Transaction failed: ${txError.message}`);
                 }
 
                 mintBtn.disabled = false;
             } catch (error) {
                 console.error("Minting error:", error);
-                document.getElementById('statusText').innerHTML = `<div class="text-red-600">
+                document.getElementById('statusText').innerHTML = `
+                    <div class="text-red-600">
                         ❌ Error: ${error.message}
                     </div>
                 `;
@@ -1312,6 +1446,16 @@
                 e.target.addEventListener('mouseleave', () => tooltip.remove());
             });
         });
+
+        window.showFeedback = function () {
+            // You can customize this function based on how you want to handle feedback
+            const message = prompt('Please share your feedback:');
+            if (message) {
+                alert('Thank you for your feedback!');
+                // Here you could send the feedback to a server or handle it in another way
+                console.log('Feedback received:', message);
+            }
+        };
 
     </script>
 
