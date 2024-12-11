@@ -104,6 +104,49 @@
             margin: 0;
         }
     </style>
+    <script>
+        // Define Telegram auth functions globally
+        window.onTelegramAuth = function(user) {
+            console.log('Telegram user:', user);
+            window.telegramUser = user;
+            
+            // Store Telegram user data
+            localStorage.setItem('telegramUser', JSON.stringify(user));
+            
+            // Enable wallet setup buttons
+            document.getElementById('createWalletBtn').disabled = false;
+            document.getElementById('importWalletBtn').disabled = false;
+            
+            // Update UI to show logged-in user
+            updateLoginStatus(user);
+        }
+
+        function updateLoginStatus(user) {
+            const walletInfo = document.getElementById('walletInfo');
+            if (user) {
+                walletInfo.innerHTML = `
+                    <div class="flex items-center gap-2">
+                        <img src="${user.photo_url}" alt="${user.first_name}" 
+                            class="w-8 h-8 rounded-full">
+                        <span>${user.first_name}</span>
+                    </div>
+                `;
+            }
+        }
+
+        // Check for existing Telegram login on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            const savedUser = localStorage.getItem('telegramUser');
+            if (savedUser) {
+                window.telegramUser = JSON.parse(savedUser);
+                updateLoginStatus(window.telegramUser);
+            } else {
+                // Disable wallet buttons until logged in
+                document.getElementById('createWalletBtn').disabled = true;
+                document.getElementById('importWalletBtn').disabled = true;
+            }
+        });
+    </script>
 </head>
 
 <body class="min-h-screen pb-8">
@@ -246,7 +289,8 @@
         window.createNewWallet = async function () {
             try {
                 // Check for Telegram authentication
-                if (!telegramUser) {
+                console.log("window.telegramUser are : ", window.telegramUser);
+                if (!window.telegramUser) {
                     throw new Error('Please login with Telegram first');
                 }
 
@@ -1386,47 +1430,6 @@
                 console.log('Feedback received:', message);
             }
         };
-
-        function onTelegramAuth(user) {
-            telegramUser = user;
-            console.log('Telegram user:', user);
-            
-            // Store Telegram user data
-            localStorage.setItem('telegramUser', JSON.stringify(user));
-            
-            // Enable wallet setup buttons
-            document.getElementById('createWalletBtn').disabled = false;
-            document.getElementById('importWalletBtn').disabled = false;
-            
-            // Update UI to show logged-in user
-            updateLoginStatus(user);
-        }
-
-        function updateLoginStatus(user) {
-            const walletInfo = document.getElementById('walletInfo');
-            if (user) {
-                walletInfo.innerHTML = `
-                    <div class="flex items-center gap-2">
-                        <img src="${user.photo_url}" alt="${user.first_name}" 
-                            class="w-8 h-8 rounded-full">
-                        <span>${user.first_name}</span>
-                    </div>
-                `;
-            }
-        }
-
-        // Check for existing Telegram login on page load
-        document.addEventListener('DOMContentLoaded', () => {
-            const savedUser = localStorage.getItem('telegramUser');
-            if (savedUser) {
-                telegramUser = JSON.parse(savedUser);
-                updateLoginStatus(telegramUser);
-            } else {
-                // Disable wallet buttons until logged in
-                document.getElementById('createWalletBtn').disabled = true;
-                document.getElementById('importWalletBtn').disabled = true;
-            }
-        });
 
     </script>
 
