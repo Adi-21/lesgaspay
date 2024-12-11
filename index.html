@@ -465,13 +465,14 @@
                 const formattedPrompt = formatPrompt(prompt, style);
                 console.log("formattedPrompt are : ", formattedPrompt);
 
-                // Call Stable Diffusion API
-                // const response = await fetch('https://api.stability.ai/v1/generation/stable-diffusion-xl-1024-v1-0/text-to-image', {
-                const response = await fetch('https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-dev', {
+                // Call Stable Diffusion API with CORS proxy
+                const response = await fetch('https://cors-anywhere.herokuapp.com/https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-dev', {
                     method: 'POST',
                     headers: {
                         'Authorization': "Bearer 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",
                         'Content-Type': 'application/json',
+                        'Origin': window.location.origin,
+                        'X-Requested-With': 'XMLHttpRequest'
                     },
                     body: JSON.stringify({
                         "inputs": formattedPrompt
@@ -480,6 +481,8 @@
                 console.log("respose are : ", response);
 
                 if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('API Error:', errorText);
                     throw new Error(`Generation failed: ${response.statusText}`);
                 }
 
@@ -500,11 +503,31 @@
 
             } catch (error) {
                 console.error("Error generating artwork:", error);
+                // Show more detailed error message
+                const errorMessage = error.message || 'Unknown error occurred';
+                document.getElementById('errorBoundary').style.display = 'block';
+                document.getElementById('errorMessage').textContent = errorMessage;
+                setTimeout(() => {
+                    document.getElementById('errorBoundary').style.display = 'none';
+                }, 5000);
                 alert(`Failed to generate artwork: ${error.message}`);
             } finally {
                 generateBtn.disabled = false;
             }
         };
+
+        // Add error handling for CORS issues
+        window.addEventListener('unhandledrejection', function(event) {
+            console.error('Unhandled promise rejection:', event.reason);
+            if (event.reason.message.includes('CORS')) {
+                document.getElementById('errorBoundary').style.display = 'block';
+                document.getElementById('errorMessage').textContent = 
+                    'CORS error: Please try again in a few moments. If the problem persists, contact support.';
+                setTimeout(() => {
+                    document.getElementById('errorBoundary').style.display = 'none';
+                }, 5000);
+            }
+        });
 
         // Helper function to format prompts based on style
         function formatPrompt(prompt, style) {
