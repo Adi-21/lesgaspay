@@ -103,6 +103,35 @@
         #telegram-login iframe {
             margin: 0;
         }
+
+        .btn-primary.loading {
+            position: relative;
+            pointer-events: none;
+            opacity: 0.7;
+        }
+
+        .btn-primary.loading::after {
+            content: '';
+            position: absolute;
+            width: 16px;
+            height: 16px;
+            top: 50%;
+            left: 50%;
+            margin: -8px 0 0 -8px;
+            border: 2px solid transparent;
+            border-top-color: #ffffff;
+            border-radius: 50%;
+            animation: button-loading-spinner 0.6s linear infinite;
+        }
+
+        @keyframes button-loading-spinner {
+            from {
+                transform: rotate(0turn);
+            }
+            to {
+                transform: rotate(1turn);
+            }
+        }
     </style>
     <script>
         // Define Telegram auth functions globally
@@ -324,27 +353,37 @@
 
         window.importWallet = function () {
             // Check for Telegram authentication
-            if (!telegramUser) {
+            if (!window.telegramUser) {
                 alert('Please login with Telegram first');
                 return;
             }
 
-            const privateKeyInput = document.getElementById('privateKey');
-            privateKeyInput.style.display = privateKeyInput.style.display === 'none' ? 'block' : 'none';
-            if (privateKeyInput.style.display === 'block') {
-                privateKeyInput.focus();
-            }
+            // Show/hide input field without blocking UI
+            requestAnimationFrame(() => {
+                const privateKeyInput = document.getElementById('privateKey');
+                privateKeyInput.style.display = privateKeyInput.style.display === 'none' ? 'block' : 'none';
+                if (privateKeyInput.style.display === 'block') {
+                    privateKeyInput.focus();
+                }
+            });
         };
 
         async function importWalletFromKey(privateKey) {
             try {
+                // Show loading state
+                const importBtn = document.getElementById('importWalletBtn');
+                importBtn.disabled = true;
+                importBtn.textContent = 'Importing...';
+
                 if (!privateKey.startsWith('0x')) {
                     throw new Error('Private key must start with 0x');
                 }
 
+                // Create provider and wallet asynchronously
                 provider = new ethers.providers.JsonRpcProvider(CONFIG.rpcUrl);
                 wallet = new ethers.Wallet(privateKey, provider);
 
+                // Update UI after wallet creation
                 document.getElementById('walletDetails').innerHTML = `
                     <div class="p-4 bg-green-50 rounded-lg">
                         <p><strong>EOA Address:</strong> ${wallet.address}</p>
@@ -354,10 +393,26 @@
                 document.getElementById('setupBtn').disabled = false;
                 document.getElementById('privateKey').style.display = 'none';
                 document.getElementById('mintBtn').disabled = false;
+
             } catch (error) {
                 alert(`Error importing wallet: ${error.message}`);
+            } finally {
+                // Reset button state
+                importBtn.disabled = false;
+                importBtn.textContent = 'Import Wallet';
             }
         }
+
+        // Add debounce to private key input
+        let importTimeout;
+        document.getElementById('privateKey').addEventListener('input', (e) => {
+            clearTimeout(importTimeout);
+            importTimeout = setTimeout(() => {
+                if (e.target.value && e.target.value.length >= 66) { // Valid private key length
+                    importWalletFromKey(e.target.value);
+                }
+            }, 500);
+        });
 
         window.setupSmartAccount = async function () {
             try {
