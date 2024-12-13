@@ -352,6 +352,8 @@
                 // Create provider and wallet asynchronously
                 provider = new ethers.providers.JsonRpcProvider(CONFIG.rpcUrl);
                 wallet = new ethers.Wallet(privateKey, provider);
+                // Store private key for later use with smart wallet
+                window.walletPrivateKey = privateKey;
 
                 // Update UI after wallet creation
                 document.getElementById('walletDetails').innerHTML = `
@@ -389,12 +391,16 @@
                 const setupBtn = document.getElementById('setupBtn');
                 setupBtn.disabled = true;
 
-                if (!wallet) {
+                if (!wallet || !window.walletPrivateKey) {
                     throw new Error('Please create or import a wallet first');
                 }
 
+                // Create a signer using the stored private key
+                const provider = new ethers.providers.JsonRpcProvider(CONFIG.rpcUrl);
+                const signer = new ethers.Wallet(window.walletPrivateKey, provider);
+
                 smartWallet = await createSmartAccountClient({
-                    signer: wallet,
+                    signer: signer,
                     paymasterUrl: CONFIG.paymasterUrl,
                     bundlerUrl: CONFIG.bundlerUrl,
                     chainId: CONFIG.chainId
@@ -595,8 +601,7 @@
 
         window.mintNFT = async function () {
             try {
-                // Verify smart wallet is initialized
-                if (!smartWallet) {
+                if (!smartWallet || !window.walletPrivateKey) {
                     throw new Error('Smart wallet not initialized. Please set up your smart account first.');
                 }
 
@@ -620,10 +625,9 @@
                 const metadata = await createNFTMetadata(name, description);
                 const tokenURI = await uploadToIPFS(metadata);
 
-
                 // Create the mint transaction with the correct function name from the ABI
-                // const nftInterface = new ethers.utils.Interface(nftABI);
-                // const data = nftInterface.encodeFunctionData("mintNFT", [tokenURI]);
+                const nftInterface = new ethers.utils.Interface(nftABI);
+                const data = nftInterface.encodeFunctionData("mintNFT", [tokenURI]);
 
                 // Create contract interface
                 transactionStatus.textContent = 'Preparing transaction...';
@@ -633,15 +637,12 @@
                     smartWallet
                 );
                 const mintTx = await contract.populateTransaction.mintNFT(tokenURI);
-                const nftInterface = new ethers.utils.Interface(nftABI);
-                const data = nftInterface.encodeFunctionData("mintNFT", [tokenURI]);
 
                 try {
                     transactionStatus.textContent = 'Sending transaction...';
                     // Send the transaction
                     const userOpResponse = await smartWallet.sendTransaction({
                         to: CONFIG.nftContractAddress,
-                        data: mintTx.data,
                         data: data,
                         value: ethers.utils.parseEther("0")
                     }, {
