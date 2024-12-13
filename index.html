@@ -556,148 +556,160 @@
         }
 
         window.mintNFT = async function () {
+            const mintBtn = document.getElementById('mintBtn');
+            const transactionStatus = document.getElementById('transactionStatus');
+            const transactionHash = document.getElementById('transactionHash');
+            const statusText = document.getElementById('statusText');
+
             try {
+                // Initial validations
                 if (!smartWallet) {
                     throw new Error('Smart wallet not initialized. Please set up your smart account first.');
                 }
+
+                mintBtn.disabled = true;
                 const smartWalletAddress = await smartWallet.getAddress();
                 console.log("Using smart wallet:", smartWalletAddress);
 
-                const walletBalance = await provider.getBalance(smartWalletAddress);
-                console.log("Smart wallet balance:", ethers.utils.formatEther(walletBalance));
-
-                const mintBtn = document.getElementById('mintBtn');
-                mintBtn.disabled = true;
-
-                const name = document.getElementById('nftName').value;
-                const description = document.getElementById('nftDescription').value;
+                // Validate input fields
+                const name = document.getElementById('nftName').value.trim();
+                const description = document.getElementById('nftDescription').value.trim();
                 const price = document.getElementById('basePrice').value;
-                const collaborator = document.getElementById('collaboratorAddress').value;
+                const collaborator = document.getElementById('collaboratorAddress').value.trim();
                 const royalty = document.getElementById('royaltyPercentage').value;
 
-                if (!name || !description || !price) {
-                    throw new Error('Please fill in all required fields');
+                if (!name || !description) {
+                    throw new Error('Please fill in name and description');
                 }
 
-                const transactionStatus = document.getElementById('transactionStatus');
-                const transactionHash = document.getElementById('transactionHash');
-
-                if (!transactionStatus || !transactionHash) {
-                    throw new Error('Required DOM elements not found');
-                }
-
+                // Display status
                 transactionStatus.style.display = 'block';
-                document.getElementById('statusText').textContent = 'Uploading to IPFS...';
+                statusText.textContent = 'Uploading to IPFS...';
 
+                // Create and upload metadata
                 const metadata = await createNFTMetadata(name, description);
-                const tokenURI = await uploadToIPFS(metadata);
+                const tokenURI = await uploadToIPFS(metadata).catch(error => {
+                    throw new Error(`IPFS Upload failed: ${error.message}`);
+                });
 
-                transactionStatus.textContent = 'Preparing transaction...';
+                statusText.textContent = 'Preparing transaction...';
 
-                // Get NFT contract information first
-                const provider = new ethers.providers.JsonRpcProvider(CONFIG.rpcUrl);
-                const nftContract = new ethers.Contract(CONFIG.nftContractAddress, nftABI, provider);
-                // const nftName = await nftContract.name();
-                // const nftSymbol = await nftContract.symbol();
-                // console.log(`Minting ${nftName} (${nftSymbol}) NFT...`);
+                // Contract interaction setup
+                const nftContract = new ethers.Contract(
+                    CONFIG.nftContractAddress,
+                    nftABI,
+                    smartWallet
+                );
 
+                // Encode transaction data
                 const data = nftContract.interface.encodeFunctionData("mintNFT", [tokenURI]);
 
-                // Verify the encoded data
-                console.log("TokenURI:", tokenURI);
-                console.log("Encoded function data:", data);
-
-                // Decode the data to verify it's correct
+                // Verify encoded data
                 const decodedData = nftContract.interface.decodeFunctionData("mintNFT", data);
-                console.log("Decoded data:", decodedData);
                 if (decodedData[0] !== tokenURI) {
-                    throw new Error("Function encoding verification failed");
+                    throw new Error("Transaction data verification failed");
                 }
 
-                // Prepare the transaction object
+                // Transaction object
                 const tx = {
                     to: CONFIG.nftContractAddress,
-                    value: 0,
-                    data: data
+                    data: data,
+                    value: ethers.utils.parseEther("0"),
+                    gasLimit: ethers.utils.hexlify(500000) // Explicit gas limit
                 };
-                console.log("tx are : ", tx);
 
-                try {
-                    transactionStatus.textContent = 'Sending transaction...';
-
-                    // Send the transaction
-                    const userOpResponse = await smartWallet.sendTransaction(tx, {
-                        paymasterServiceData: {
-                            mode: PaymasterMode.SPONSORED
-                        }
-                    });
-
-                    console.log("Transaction submitted:", userOpResponse);
-                    const txHash = await userOpResponse.waitForTxHash();
-                    console.log("Transaction hash received:", txHash);
-
-
-                    // if (!userOpResponse || !userOpResponse.hash) {
-                    //     // Wait for the transaction to be mined
-                    //     const receipt = await userOpResponse.wait();
-                    //     console.log("Transaction receipt:", receipt);
-                    //     userOpResponse.hash = receipt.transactionHash;
-                    // }
-                    // console.log("userOpResponse.hash:", userOpResponse.hash);
-
-                    transactionStatus.textContent = 'Minting in progress...';
-                    transactionHash.innerHTML = `
-                        Transaction Hash: <a href="https://subnets.avax.network/c-chain/tx/${userOpResponse.hash}" 
-                        target="_blank" class="underline">${userOpResponse.hash}</a>
-                    `;
-
-                    // Wait for transaction confirmation
-                    const receipt = await userOpResponse.wait();
-                    console.log("Transaction confirmed:", receipt);
-
-                    if (receipt.status === 1) {
-                        transactionStatus.innerHTML = `
-                            <div class="text-green-600">
-                                ✅ NFT Minted Successfully!<br>
-                                Price: ${price} ETH<br>
-                                ${collaborator ? `Collaborator: ${collaborator} (${royalty}%)` : ''}
-                            </div>
-                        `;
-
-                        transactionHash.innerHTML += ` 
-                            <br>View your NFT on: <a href="https://nft.avax.network/collection/${CONFIG.nftContractAddress}" 
-                            target="_blank" class="underline">Avalanche NFT Marketplace</a>
-                        `;
-                    } else {
-                        throw new Error('Transaction failed');
+                // Send transaction
+                statusText.textContent = 'Sending transaction...';
+                const userOpResponse = await smartWallet.sendTransaction(tx, {
+                    paymasterServiceData: {
+                        mode: PaymasterMode.SPONSORED
                     }
-                } catch (txError) {
-                    console.error('Transaction error:', txError);
-                    throw new Error(`Transaction failed: ${txError.message}`);
-                }
-            } catch (error) {
-                console.error('Transaction error:', error);
+                }).catch(error => {
+                    if (error.message.includes('user denied')) {
+                        throw new Error('Transaction was rejected by user');
+                    }
+                    throw error;
+                });
 
-                const errorMessage = error.message || 'Unknown error occurred';
+                console.log("Transaction submitted:", userOpResponse);
 
-                if (errorMessage.includes('user rejected')) {
-                    handleError('Transaction was rejected');
-                } else if (errorMessage.includes('insufficient funds')) {
-                    handleError('Insufficient funds for transaction');
-                } else if (errorMessage.includes('maximum duration')) {
-                    handleError('Transaction took too long. Please try again');
+                // Wait for transaction hash
+                statusText.textContent = 'Waiting for transaction hash...';
+                const txHash = await userOpResponse.waitForTxHash().catch(error => {
+                    throw new Error(`Failed to get transaction hash: ${error.message}`);
+                });
+
+                // Update UI with transaction hash
+                transactionHash.innerHTML = `
+            Transaction Hash: <a href="https://subnets.avax.network/c-chain/tx/${txHash}" 
+            target="_blank" class="underline">${txHash}</a>
+        `;
+
+                // Wait for confirmation
+                statusText.textContent = 'Waiting for confirmation...';
+                const receipt = await userOpResponse.wait().catch(error => {
+                    throw new Error(`Transaction confirmation failed: ${error.message}`);
+                });
+
+                console.log("Transaction receipt:", receipt);
+
+                // Handle success
+                if (receipt.status === 1) {
+                    // Set royalties if specified
+                    if (collaborator && royalty) {
+                        try {
+                            await nftContract.setRoyalties(receipt.events[0].args.tokenId, collaborator, royalty);
+                        } catch (royaltyError) {
+                            console.error("Failed to set royalties:", royaltyError);
+                            // Continue as NFT is already minted
+                        }
+                    }
+
+                    statusText.innerHTML = `
+                <div class="text-green-600">
+                    ✅ NFT Minted Successfully!<br>
+                    Name: ${name}<br>
+                    ${price ? `Price: ${price} ETH<br>` : ''}
+                    ${collaborator ? `Collaborator: ${collaborator} (${royalty}%)` : ''}
+                </div>
+            `;
+
+                    transactionHash.innerHTML += `
+                <br>View your NFT on: <a href="https://nft.avax.network/collection/${CONFIG.nftContractAddress}" 
+                target="_blank" class="underline">Avalanche NFT Marketplace</a>
+            `;
                 } else {
-                    handleError(`Transaction failed: ${errorMessage}`);
+                    throw new Error('Transaction failed on-chain');
                 }
 
-                if (transactionStatus) {
-                    transactionStatus.innerHTML = `
-                        <div class="text-red-600">
-                            ❌ Error: ${errorMessage}
-                        </div>
-                    `;
+            } catch (error) {
+                console.error('Minting error:', error);
+
+                // Handle specific error cases
+                let errorMessage = 'An unknown error occurred';
+                if (error.message.includes('insufficient funds')) {
+                    errorMessage = 'Insufficient funds to complete the transaction';
+                } else if (error.message.includes('user denied')) {
+                    errorMessage = 'Transaction was rejected';
+                } else if (error.message.includes('maximum duration')) {
+                    errorMessage = 'Transaction took too long. Please try again';
+                } else if (error.message.includes('nonce too low')) {
+                    errorMessage = 'Transaction failed: Please refresh and try again';
+                } else {
+                    errorMessage = error.message;
                 }
+
+                // Update UI with error
+                if (statusText) {
+                    statusText.innerHTML = `
+                <div class="text-red-600">
+                    ❌ Error: ${errorMessage}
+                </div>
+            `;
+                }
+
             } finally {
+                // Cleanup
                 if (mintBtn) {
                     mintBtn.disabled = false;
                 }
