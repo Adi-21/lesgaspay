@@ -1,0 +1,11 @@
+{
+    "rpcUrl": "Yours RPC URL",
+    "bundlerUrl": "Yours Bundler URL",
+    "paymasterUrl": "Yours Paymaster URL",
+    "chainId": "Yours Chain ID",
+    "nftContractAddress": "Yours NFT Contract Address",
+    "pinata": {
+        "jwt": "Yours Pinata JWT",
+        "apiEndpoint": "Yours Pinata API Endpoint"
+    }
+}
