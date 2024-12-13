@@ -258,42 +258,18 @@
     <script type="module">
         import { createSmartAccountClient, PaymasterMode } from 'https://cdn.jsdelivr.net/npm/@0xgasless/smart-account@0.0.11/+esm';
 
-        const envVars = {};
-
-        async function loadEnvVars() {
-            try {
-                const response = await fetch('/.env');
-            const text = await response.text();
-            
-            text.split('\n').forEach(line => {
-                if (line && !line.startsWith('#')) {
-                    const [key, value] = line.split('=');
-                    if (key && value) {
-                        envVars[key.trim()] = value.trim();
-                    }
-                }
-            });
-        } catch (error) {
-                console.error('Error loading environment variables:', error);
-            }
-        }
-
-        await loadEnvVars();
-
         // Update CONFIG to use environment variables
         const CONFIG = {
-            rpcUrl: envVars.RPC_URL,
-            bundlerUrl: envVars.BUNDLER_URL,
-            paymasterUrl: envVars.PAYMASTER_URL,
+            rpcUrl: "https://avax-mainnet.g.alchemy.com/v2/VcifYAbO7TUL14eUvHmbjSklgVzWEMXk",
+            bundlerUrl: "https://bundler.0xgasless.com/43114",
+            paymasterUrl: "https://paymaster.0xgasless.com/v1/43114/rpc/35b99953-edde-4f28-9661-c41898916471",
             chainId: 43114,
-            privateKey: envVars.PRIVATE_KEY,
-            nftContractAddress: envVars.NFT_CONTRACT_ADDRESS,
-            stabilityApiKey: envVars.STABILITY_API_KEY,
+            nftContractAddress: "0xe7337B97F380A19A860068f0dACa74F50AF86548",
             pinata: {
-                jwt: envVars.PINATA_JWT,
-                    apiEndpoint: 'https://api.pinata.cloud/pinning'
-                }
-            };
+                jwt: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySW5mb3JtYXRpb24iOnsiaWQiOiIxOTc0ZWM3ZS1hNjk5LTQzM2QtODk1MS00YTEyMDcyOGY2MzkiLCJlbWFpbCI6ImFkaXMyMTEwNEBnbWFpbC5jb20iLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZSwicGluX3BvbGljeSI6eyJyZWdpb25zIjpbeyJkZXNpcmVkUmVwbGljYXRpb25Db3VudCI6MSwiaWQiOiJGUkExIn0seyJkZXNpcmVkUmVwbGljYXRpb25Db3VudCI6MSwiaWQiOiJOWUMxIn1dLCJ2ZXJzaW9uIjoxfSwibWZhX2VuYWJsZWQiOmZhbHNlLCJzdGF0dXMiOiJBQ1RJVkUifSwiYXV0aGVudGljYXRpb25UeXBlIjoic2NvcGVkS2V5Iiwic2NvcGVkS2V5S2V5IjoiNzhjOTM3NDMwNGMzYmRjNmYyYTciLCJzY29wZWRLZXlTZWNyZXQiOiIxYTUxMzAwY2ZhYWE2ZDY0M2JkOTYyMWIxNjA3ZmViYWUwNjQzMzA4NTk3Y2EyNDBhZTdjMzk3N2FmMDI0M2RhIiwiZXhwIjoxNzY1MjkwNDEwfQ.mGeY9zom2wbgZjlKHkrDQNisAKhv93-vk_X2D2mCZow",
+                apiEndpoint: 'https://api.pinata.cloud/pinning'
+            }
+        };
 
         let smartWallet;
         let provider;
@@ -535,54 +511,76 @@
 
         async function uploadToIPFS(metadata) {
             try {
-                // First, upload the image to Pinata
-                const imageBlob = await fetch(document.getElementById('artworkPreview').src).then(r => r.blob());
-                const imageFormData = new FormData();
-                imageFormData.append('file', imageBlob, 'artwork.png');
+                // Get the image from the preview
+                const imageElement = document.getElementById('artworkPreview');
+                const imageUrl = imageElement.src;
 
+                // Convert base64 image to blob
+                const base64Response = await fetch(imageUrl);
+                const blob = await base64Response.blob();
+
+                // Create form data for image
+                const imageFormData = new FormData();
+                imageFormData.append('file', blob, 'artwork.png');
+
+                // Upload image to Pinata
                 const imageResponse = await fetch('https://api.pinata.cloud/pinning/pinFileToIPFS', {
                     method: 'POST',
                     headers: {
-                        'Authorization': `Bearer ${CONFIG.pinata.jwt}`,
-                        'Accept': 'application/json'
+                        'Authorization': `Bearer ${CONFIG.pinata.jwt}`
                     },
                     body: imageFormData
                 });
 
                 if (!imageResponse.ok) {
                     const errorData = await imageResponse.json();
-                    console.error('Pinata Error:', errorData);
-                    throw new Error('Failed to upload image to IPFS');
+                    console.error('Pinata Image Upload Error:', errorData);
+                    throw new Error(`Failed to upload image: ${errorData.message || 'Unknown error'}`);
                 }
 
-                const imageResult = await imageResponse.json();
-                const imageIPFSHash = imageResult.IpfsHash;
+                const imageData = await imageResponse.json();
+                console.log('Image uploaded to IPFS:', imageData);
 
-                // Update metadata with the IPFS image URL
-                metadata.image = `ipfs://${imageIPFSHash}`;
+                // Update metadata with IPFS image URL
+                metadata.image = `ipfs://${imageData.IpfsHash}`;
 
-                // Then upload the metadata JSON to Pinata
+                // Prepare metadata for upload
+                const metadataJSON = JSON.stringify({
+                    pinataOptions: {
+                        cidVersion: 1
+                    },
+                    pinataMetadata: {
+                        name: metadata.name,
+                        keyvalues: {
+                            type: "AI NFT Metadata"
+                        }
+                    },
+                    pinataContent: metadata
+                });
+
+                // Upload metadata to Pinata
                 const metadataResponse = await fetch('https://api.pinata.cloud/pinning/pinJSONToIPFS', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${CONFIG.pinata.jwt}`,
-                        'Accept': 'application/json'
+                        'Authorization': `Bearer ${CONFIG.pinata.jwt}`
                     },
-                    body: JSON.stringify(metadata)
+                    body: metadataJSON
                 });
 
                 if (!metadataResponse.ok) {
                     const errorData = await metadataResponse.json();
-                    console.error('Pinata Metadata Error:', errorData);
-                    throw new Error('Failed to upload metadata to IPFS');
+                    console.error('Pinata Metadata Upload Error:', errorData);
+                    throw new Error(`Failed to upload metadata: ${errorData.message || 'Unknown error'}`);
                 }
 
                 const metadataResult = await metadataResponse.json();
+                console.log('Metadata uploaded to IPFS:', metadataResult);
+
                 return `ipfs://${metadataResult.IpfsHash}`;
             } catch (error) {
-                console.error('Error uploading to IPFS:', error);
-                throw new Error('Failed to upload to IPFS: ' + error.message);
+                console.error('IPFS Upload Error:', error);
+                throw error;
             }
         }
 
