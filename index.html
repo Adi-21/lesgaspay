@@ -625,32 +625,28 @@
                 const metadata = await createNFTMetadata(name, description);
                 const tokenURI = await uploadToIPFS(metadata);
 
-                // Create the mint transaction with the correct function name from the ABI
+                transactionStatus.textContent = 'Preparing transaction...';
+
+                // Create function interface and encode the mint function call
                 const nftInterface = new ethers.utils.Interface(nftABI);
                 const data = nftInterface.encodeFunctionData("mintNFT", [tokenURI]);
 
-                // Create contract interface
-                transactionStatus.textContent = 'Preparing transaction...';
-                // const contract = new ethers.Contract(
-                //     CONFIG.nftContractAddress,
-                //     nftABI,
-                //     smartWallet
-                // );
-                const mintTx = await nftInterface.populateTransaction.mintNFT(tokenURI);
+                // Prepare the transaction object
+                const tx = {
+                    to: CONFIG.nftContractAddress,
+                    value: ethers.utils.parseEther("0"),
+                    data: data
+                };
 
                 try {
                     transactionStatus.textContent = 'Sending transaction...';
                     // Send the transaction
-                    const userOpResponse = await smartWallet.sendTransaction({
-                        to: CONFIG.nftContractAddress,
-                        data: data,
-                        value: ethers.utils.parseEther("0")
-                    }, {
+                    const userOpResponse = await smartWallet.sendTransaction(tx, {
                         paymasterServiceData: {
                             mode: PaymasterMode.SPONSORED
                         }
                     });
-                    console.log("userOpResponse are : ", userOpResponse);
+
                     console.log("userOpResponse.hash are : ", userOpResponse.hash);
 
                     transactionStatus.textContent = 'Minting in progress...';
