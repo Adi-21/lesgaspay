@@ -619,9 +619,15 @@
                 }
 
                 const transactionStatus = document.getElementById('transactionStatus');
-                transactionStatus.style.display = 'block';
+                const transactionHash = document.getElementById('transactionHash');
+                
+                if (!transactionStatus || !transactionHash) {
+                    throw new Error('Required DOM elements not found');
+                }
 
+                transactionStatus.style.display = 'block';
                 document.getElementById('statusText').textContent = 'Uploading to IPFS...';
+
                 const metadata = await createNFTMetadata(name, description);
                 const tokenURI = await uploadToIPFS(metadata);
 
@@ -641,16 +647,23 @@
                 try {
                     transactionStatus.textContent = 'Sending transaction...';
                     // Send the transaction
-                    const userOpResponse = await smartWallet.sendTransaction(tx, {
+                    const userOpResponse = await smartWallet.sendTransaction({
+                        to: CONFIG.nftContractAddress,
+                        data: data,
+                        value: ethers.utils.parseEther("0")
+                    }, {
                         paymasterServiceData: {
                             mode: PaymasterMode.SPONSORED
                         }
                     });
 
-                    console.log("userOpResponse.hash are : ", userOpResponse.hash);
+                    if (!userOpResponse || !userOpResponse.hash) {
+                        throw new Error('Transaction failed: No transaction hash received');
+                    }
+                    console.log("userOpResponse.hash:", userOpResponse.hash);
 
                     transactionStatus.textContent = 'Minting in progress...';
-                    document.getElementById('transactionHash').innerHTML = `
+                    transactionHash.innerHTML = `
                         Transaction Hash: <a href="https://subnets.avax.network/c-chain/tx/${userOpResponse.hash}" 
                         target="_blank" class="underline">${userOpResponse.hash}</a>
                     `;
@@ -658,7 +671,7 @@
                     // Function to poll for receipt
                     const getReceipt = async (hash, attempts = 0) => {
                         try {
-                            if (attempts > 20) { // Max 20 attempts (100 seconds total)
+                            if (attempts > 20) {
                                 throw new Error('Transaction taking too long to confirm');
                             }
 
@@ -667,7 +680,6 @@
                                 return receipt;
                             }
 
-                            // Wait 5 seconds before next attempt
                             await new Promise(resolve => setTimeout(resolve, 5000));
                             return getReceipt(hash, attempts + 1);
                         } catch (error) {
@@ -676,7 +688,6 @@
                         }
                     };
 
-                    // Poll for receipt with status updates
                     transactionStatus.innerHTML = `
                         <div class="text-blue-600">
                             ⏳ Waiting for transaction confirmation...<br>
@@ -698,7 +709,6 @@
                                 </div>
                             `;
 
-                            // Add link to view NFT
                             transactionHash.innerHTML += ` 
                                 <br>View your NFT on: <a href="https://nft.avax.network/collection/${CONFIG.nftContractAddress}" 
                                 target="_blank" class="underline">Avalanche NFT Marketplace</a>
@@ -707,7 +717,7 @@
                             throw new Error('Transaction failed');
                         }
                     } catch (receiptError) {
-                        // Handle timeout or receipt fetch error
+                        console.error('Receipt error:', receiptError);
                         transactionStatus.innerHTML = `
                             <div class="text-yellow-600">
                                 ⚠️ Transaction submitted but confirmation status unknown.<br>
@@ -716,21 +726,23 @@
                             </div>
                         `;
                     }
-
                 } catch (txError) {
                     console.error('Transaction error:', txError);
                     throw new Error(`Transaction failed: ${txError.message}`);
                 }
-
-                mintBtn.disabled = false;
             } catch (error) {
                 console.error("Minting error:", error);
-                transactionStatus.innerHTML = `
-                    <div class="text-red-600">
-                        ❌ Error: ${error.message}
-                    </div>
-                `;
-                mintBtn.disabled = false;
+                if (transactionStatus) {
+                    transactionStatus.innerHTML = `
+                        <div class="text-red-600">
+                            ❌ Error: ${error.message}
+                        </div>
+                    `;
+                }
+            } finally {
+                if (mintBtn) {
+                    mintBtn.disabled = false;
+                }
             }
         };
 
