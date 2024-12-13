@@ -321,57 +321,40 @@
             }
         };
 
-        window.importWallet = function () {
-            // Check for Telegram authentication
+        window.importWallet = function() {
+
             if (!window.telegramUser) {
                 alert('Please login with Telegram first');
                 return;
             }
 
-            // Show/hide input field without blocking UI
-            requestAnimationFrame(() => {
-                const privateKeyInput = document.getElementById('privateKey');
-                privateKeyInput.style.display = privateKeyInput.style.display === 'none' ? 'block' : 'none';
-                if (privateKeyInput.style.display === 'block') {
-                    privateKeyInput.focus();
+            const privateKeyInput = document.getElementById('privateKey');
+            privateKeyInput.style.display = 'block';
+            privateKeyInput.value = '';
+            privateKeyInput.focus();
+            
+            privateKeyInput.onkeyup = async function(e) {
+                if (e.key === 'Enter') {
+                    try {
+                        const privateKey = privateKeyInput.value.trim();
+                        if (!privateKey.startsWith('0x')) {
+                            throw new Error('Private key must start with 0x');
+                        }
+
+                        provider = new ethers.providers.JsonRpcProvider(CONFIG.rpcUrl);
+                        wallet = new ethers.Wallet(privateKey, provider);
+                        
+                        document.getElementById('walletInfo').innerHTML = `
+                            <p><strong>EOA Address:</strong> ${wallet.address}</p>
+                            <p><strong>Status:</strong> Wallet imported successfully!</p>
+                        `;
+
+                        document.getElementById('setupBtn').disabled = false;
+                        privateKeyInput.style.display = 'none';
+                    } catch (error) {
+                        document.getElementById('walletInfo').innerHTML = `Error: ${error.message}`;
+                    }
                 }
-            });
-        };
-
-        async function importWalletFromKey(privateKey) {
-            try {
-                // Show loading state
-                const importBtn = document.getElementById('importWalletBtn');
-                importBtn.disabled = true;
-                importBtn.textContent = 'Importing...';
-
-                if (!privateKey.startsWith('0x')) {
-                    throw new Error('Private key must start with 0x');
-                }
-
-                // Create provider and wallet asynchronously
-                provider = new ethers.providers.JsonRpcProvider(CONFIG.rpcUrl);
-                wallet = new ethers.Wallet(privateKey, provider);
-                // Store private key for later use with smart wallet
-                window.walletPrivateKey = privateKey;
-
-                // Update UI after wallet creation
-                document.getElementById('walletDetails').innerHTML = `
-                    <div class="p-4 bg-green-50 rounded-lg">
-                        <p><strong>EOA Address:</strong> ${wallet.address}</p>
-                        <p><strong>Status:</strong> Wallet imported successfully!</p>
-                    </div>
-                `;
-                document.getElementById('setupBtn').disabled = false;
-                document.getElementById('privateKey').style.display = 'none';
-                document.getElementById('mintBtn').disabled = false;
-
-            } catch (error) {
-                alert(`Error importing wallet: ${error.message}`);
-            } finally {
-                // Reset button state
-                importBtn.disabled = false;
-                importBtn.textContent = 'Import Wallet';
             }
         }
 
@@ -391,26 +374,23 @@
                 const setupBtn = document.getElementById('setupBtn');
                 setupBtn.disabled = true;
 
-                if (!wallet || !window.walletPrivateKey) {
-                    throw new Error('Please create or import a wallet first');
+                // Create wallet from signer (this is your EOA wallet)
+                if (!wallet) {
+                    throw new Error('Please create or import wallet first');
                 }
 
-                // Create a signer using the stored private key
-                const provider = new ethers.providers.JsonRpcProvider(CONFIG.rpcUrl);
-                const signer = new ethers.Wallet(window.walletPrivateKey, provider);
-
+                // Create smart account
                 smartWallet = await createSmartAccountClient({
-                    signer: signer,
+                    signer: wallet, // This is your EOA that will sign transactions
                     paymasterUrl: CONFIG.paymasterUrl,
                     bundlerUrl: CONFIG.bundlerUrl,
                     chainId: CONFIG.chainId
                 });
 
-                if (!smartWallet) {
-                    throw new Error('Failed to initialize smart wallet');
-                }
-
+                // Verify smart account
                 const address = await smartWallet.getAddress();
+                console.log("Smart Account Address:", address);
+
                 document.getElementById('smartAccountInfo').innerHTML = `
                     <div class="p-4 bg-green-50 rounded-lg">
                         <p><strong>Smart Account Address:</strong> ${address}</p>
@@ -418,18 +398,12 @@
                     </div>
                 `;
 
-                // Show NFT creation sections after smart account setup
+                // Enable NFT minting UI
                 document.getElementById('nftCreation').style.display = 'block';
                 document.getElementById('nftDetails').style.display = 'block';
 
-                setupBtn.disabled = true; // Keep disabled after setup
             } catch (error) {
                 console.error('Smart Account Setup Error:', error);
-                document.getElementById('smartAccountInfo').innerHTML = `
-                    <div class="p-4 bg-red-50 rounded-lg text-red-600">
-                        Error: ${error.message}
-                    </div>
-                `;
                 setupBtn.disabled = false;
             }
         };
@@ -634,7 +608,7 @@
                 transactionStatus.textContent = 'Preparing transaction...';
 
                 // Get NFT contract information first
-                const nftContract = new ethers.Contract(CONFIG.nftContractAddress, nftABI, provider);
+                const nftContract = new ethers.Contract(CONFIG.nftContractAddress, nftABI, smartWallet);
                 // const nftName = await nftContract.name();
                 // const nftSymbol = await nftContract.symbol();
                 // console.log(`Minting ${nftName} (${nftSymbol}) NFT...`);
@@ -643,17 +617,27 @@
                 const nftInterface = new ethers.utils.Interface(nftABI);
                 const data = nftInterface.encodeFunctionData("mintNFT", [tokenURI]);
 
+                // Verify the encoded data
+                console.log("TokenURI:", tokenURI);
+                console.log("Encoded function data:", data);
+
+                // Decode the data to verify it's correct
+                const decodedData = nftInterface.decodeFunctionData("mintNFT", data);
+                console.log("Decoded data:", decodedData);
+                if (decodedData[0] !== tokenURI) {
+                    throw new Error("Function encoding verification failed");
+                }
+
                 // Prepare the transaction object
                 const tx = {
                     to: CONFIG.nftContractAddress,
-                    value: ethers.utils.parseEther("0"),
+                    value: 0,
                     data: data
                 };
                 console.log("tx are : ", tx);
 
                 try {
                     transactionStatus.textContent = 'Sending transaction...';
-                    // transactionStatus.innerHTML = `Minting ${nftName} NFT...`;
                     
                     // Send the transaction
                     const userOpResponse = await smartWallet.sendTransaction(tx, {
@@ -662,8 +646,13 @@
                         }
                     });
 
+                    console.log("Transaction submitted:", userOpResponse);
+
                     if (!userOpResponse || !userOpResponse.hash) {
-                        throw new Error('Transaction failed: No transaction hash received');
+                        // Wait for the transaction to be mined
+                        const receipt = await userOpResponse.wait();
+                        console.log("Transaction receipt:", receipt);
+                        userOpResponse.hash = receipt.transactionHash;
                     }
                     console.log("userOpResponse.hash:", userOpResponse.hash);
 
@@ -673,76 +662,25 @@
                         target="_blank" class="underline">${userOpResponse.hash}</a>
                     `;
 
-                    // Function to poll for receipt
-                    const getReceipt = async (hash, attempts = 0) => {
-                        try {
-                            if (attempts > 20) {
-                                throw new Error('Transaction taking too long to confirm');
-                            }
+                    // Wait for transaction confirmation
+                    const receipt = await provider.waitForTransaction(userOpResponse.hash);
+                    console.log("Final receipt:", receipt);
 
-                            const receipt = await provider.getTransactionReceipt(hash);
-                            if (receipt) {
-                                return receipt;
-                            }
-
-                            await new Promise(resolve => setTimeout(resolve, 5000));
-                            return getReceipt(hash, attempts + 1);
-                        } catch (error) {
-                            console.error('Error getting receipt:', error);
-                            throw error;
-                        }
-                    };
-
-                    transactionStatus.innerHTML = `
-                        <div class="text-blue-600">
-                            ⏳ Waiting for transaction confirmation...<br>
-                            This may take a few minutes.
-                        </div>
-                    `;
-
-                    try {
-                        const receipt = await getReceipt(userOpResponse.hash);
-                        console.log("Transaction receipt:", receipt);
-
-                        if (receipt.status === 1) {
-                            // Get the minted token ID from the event logs
-                            const mintEvent = receipt.logs
-                                .map(log => {
-                                    try {
-                                        return nftContract.interface.parseLog(log);
-                                    } catch (e) {
-                                        return null;
-                                    }
-                                })
-                                .find(event => event && event.name === 'Transfer');
-                            
-                            const tokenId = mintEvent ? mintEvent.args.tokenId.toString() : 'unknown';
-
-                            transactionStatus.innerHTML = `
-                                <div class="text-green-600">
-                                    ✅ NFT Minted Successfully!<br>
-                                    Token ID: ${tokenId}<br>
-                                    Price: ${price} ETH<br>
-                                    ${collaborator ? `Collaborator: ${collaborator} (${royalty}%)` : ''}
-                                </div>
-                            `;
-
-                            transactionHash.innerHTML += ` 
-                                <br>View your NFT on: <a href="https://nft.avax.network/collection/${CONFIG.nftContractAddress}" 
-                                target="_blank" class="underline">Avalanche NFT Marketplace</a>
-                            `;
-                        } else {
-                            throw new Error('Transaction failed');
-                        }
-                    } catch (receiptError) {
-                        console.error('Receipt error:', receiptError);
+                    if (receipt.status === 1) {
                         transactionStatus.innerHTML = `
-                            <div class="text-yellow-600">
-                                ⚠️ Transaction submitted but confirmation status unknown.<br>
-                                You can check the status using the transaction hash above.<br>
-                                <small>This doesn't necessarily mean the transaction failed.</small>
+                            <div class="text-green-600">
+                                ✅ NFT Minted Successfully!<br>
+                                Price: ${price} ETH<br>
+                                ${collaborator ? `Collaborator: ${collaborator} (${royalty}%)` : ''}
                             </div>
                         `;
+
+                        transactionHash.innerHTML += ` 
+                            <br>View your NFT on: <a href="https://nft.avax.network/collection/${CONFIG.nftContractAddress}" 
+                            target="_blank" class="underline">Avalanche NFT Marketplace</a>
+                        `;
+                    } else {
+                        throw new Error('Transaction failed');
                     }
                 } catch (txError) {
                     console.error('Transaction error:', txError);
