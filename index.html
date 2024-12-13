@@ -560,6 +560,11 @@
                 if (!smartWallet) {
                     throw new Error('Smart wallet not initialized. Please set up your smart account first.');
                 }
+                const smartWalletAddress = await smartWallet.getAddress();
+                console.log("Using smart wallet:", smartWalletAddress);
+
+                const walletBalance = await provider.getBalance(smartWalletAddress);
+                console.log("Smart wallet balance:", ethers.utils.formatEther(walletBalance));          
 
                 const mintBtn = document.getElementById('mintBtn');
                 mintBtn.disabled = true;
@@ -628,14 +633,17 @@
                     });
 
                     console.log("Transaction submitted:", userOpResponse);
+                    const txHash = await userOpResponse.waitForTxHash();
+                    console.log("Transaction hash received:", txHash);
 
-                    if (!userOpResponse || !userOpResponse.hash) {
-                        // Wait for the transaction to be mined
-                        const receipt = await userOpResponse.wait();
-                        console.log("Transaction receipt:", receipt);
-                        userOpResponse.hash = receipt.transactionHash;
-                    }
-                    console.log("userOpResponse.hash:", userOpResponse.hash);
+
+                    // if (!userOpResponse || !userOpResponse.hash) {
+                    //     // Wait for the transaction to be mined
+                    //     const receipt = await userOpResponse.wait();
+                    //     console.log("Transaction receipt:", receipt);
+                    //     userOpResponse.hash = receipt.transactionHash;
+                    // }
+                    // console.log("userOpResponse.hash:", userOpResponse.hash);
 
                     transactionStatus.textContent = 'Minting in progress...';
                     transactionHash.innerHTML = `
@@ -644,8 +652,8 @@
                     `;
 
                     // Wait for transaction confirmation
-                    const receipt = await provider.waitForTransaction(userOpResponse.hash);
-                    console.log("Final receipt:", receipt);
+                    const receipt = await userOpResponse.wait();
+                    console.log("Transaction confirmed:", receipt);
 
                     if (receipt.status === 1) {
                         transactionStatus.innerHTML = `
@@ -667,8 +675,19 @@
                     console.error('Transaction error:', txError);
                     throw new Error(`Transaction failed: ${txError.message}`);
                 }
-            } catch (error) {
-                console.error("Minting error:", error);
+            } catch (error || txError) {
+                console.error('Transaction error:', txError);
+                if (txError.message.includes('user rejected')) {
+                    throw new Error('Transaction was rejected');
+                } else if (txError.message.includes('insufficient funds')) {
+                    throw new Error('Insufficient funds for transaction');
+                } else if (txError.message.includes('maximum duration')) {
+                    // Retry logic for timeout
+                    throw new Error('Transaction took too long. Please try again');
+                } else {
+                    throw new Error(`Transaction failed: ${txError.message}`);
+                }
+                console.log("Minting error:", error);
                 if (transactionStatus) {
                     transactionStatus.innerHTML = `
                         <div class="text-red-600">
