@@ -389,12 +389,20 @@
                 const setupBtn = document.getElementById('setupBtn');
                 setupBtn.disabled = true;
 
+                if (!wallet) {
+                    throw new Error('Please create or import a wallet first');
+                }
+
                 smartWallet = await createSmartAccountClient({
                     signer: wallet,
                     paymasterUrl: CONFIG.paymasterUrl,
                     bundlerUrl: CONFIG.bundlerUrl,
                     chainId: CONFIG.chainId
                 });
+
+                if (!smartWallet || !smartWallet.signer) {
+                    throw new Error('Failed to initialize smart wallet');
+                }
 
                 const address = await smartWallet.getAddress();
                 document.getElementById('smartAccountInfo').innerHTML = `
@@ -410,6 +418,7 @@
 
                 setupBtn.disabled = true; // Keep disabled after setup
             } catch (error) {
+                console.error('Smart Account Setup Error:', error);
                 document.getElementById('smartAccountInfo').innerHTML = `
                     <div class="p-4 bg-red-50 rounded-lg text-red-600">
                         Error: ${error.message}
@@ -586,6 +595,11 @@
 
         window.mintNFT = async function () {
             try {
+                // Verify smart wallet is initialized
+                if (!smartWallet || !smartWallet.signer) {
+                    throw new Error('Smart wallet not initialized. Please set up your smart account first.');
+                }
+
                 const mintBtn = document.getElementById('mintBtn');
                 mintBtn.disabled = true;
 
@@ -601,41 +615,35 @@
 
                 const transactionStatus = document.getElementById('transactionStatus');
                 transactionStatus.style.display = 'block';
-                document.getElementById('statusText').textContent = 'Uploading to IPFS...';
 
-                // Create and upload metadata
+                document.getElementById('statusText').textContent = 'Uploading to IPFS...';
                 const metadata = await createNFTMetadata(name, description);
                 const tokenURI = await uploadToIPFS(metadata);
 
-                if (document.getElementById('statusText')) {
-                    document.getElementById('statusText').textContent = 'Preparing to mint NFT...';
-                }
 
                 // Create the mint transaction with the correct function name from the ABI
                 // const nftInterface = new ethers.utils.Interface(nftABI);
                 // const data = nftInterface.encodeFunctionData("mintNFT", [tokenURI]);
 
                 // Create contract interface
-                const nftInterface = new ethers.Contract(
+                transactionStatus.textContent = 'Preparing transaction...';
+                const nftInterface = new ethers.utils.Interface(nftABI);
+                const contract = new ethers.Contract(
                     CONFIG.nftContractAddress,
                     nftABI,
-                    smartWallet
+                    smartWallet.signer || smartWallet
                 );
-                const data = nftInterface.encodeFunctionData("mintNFT", [tokenURI]);
 
-                transactionStatus.textContent = 'Preparing transaction...';
-
-                // const tx = {
-                //     to: CONFIG.nftContractAddress,
-                //     data: data,
-                //     value: "0x0"
-                // };
-                const mintTx = await nftInterface.populateTransaction.mintNFT(tokenURI);
+                const mintTx = await contract.populateTransaction.mintNFT(tokenURI);
 
                 try {
                     transactionStatus.textContent = 'Sending transaction...';
                     // Send the transaction
-                    const userOpResponse = await smartWallet.sendTransaction(tx, {
+                    const userOpResponse = await smartWallet.sendTransaction({
+                        to: CONFIG.nftContractAddress,
+                        data: mintTx.data,
+                        value: ethers.utils.parseEther("0")
+                    }, {
                         paymasterServiceData: {
                             mode: PaymasterMode.SPONSORED
                         }
@@ -656,7 +664,7 @@
                                 throw new Error('Transaction taking too long to confirm');
                             }
 
-                            const receipt = await provider.getTransactionReceipt(userOpResponse.hash);
+                            const receipt = await provider.getTransactionReceipt(hash);
                             if (receipt) {
                                 return receipt;
                             }
