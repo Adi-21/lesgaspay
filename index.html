@@ -633,6 +633,12 @@
 
                 transactionStatus.textContent = 'Preparing transaction...';
 
+                // Get NFT contract information first
+                const nftContract = new ethers.Contract(CONFIG.nftContractAddress, nftABI, provider);
+                const nftName = await nftContract.name();
+                const nftSymbol = await nftContract.symbol();
+                console.log(`Minting ${nftName} (${nftSymbol}) NFT...`);
+
                 // Create function interface and encode the mint function call
                 const nftInterface = new ethers.utils.Interface(nftABI);
                 const data = nftInterface.encodeFunctionData("mintNFT", [tokenURI]);
@@ -643,15 +649,14 @@
                     value: ethers.utils.parseEther("0"),
                     data: data
                 };
+                console.log("tx are : ", tx);
 
                 try {
                     transactionStatus.textContent = 'Sending transaction...';
+                    transactionStatus.innerHTML = `Minting ${nftName} NFT...`;
+                    
                     // Send the transaction
-                    const userOpResponse = await smartWallet.sendTransaction({
-                        to: CONFIG.nftContractAddress,
-                        data: data,
-                        value: ethers.utils.parseEther("0")
-                    }, {
+                    const userOpResponse = await smartWallet.sendTransaction(tx, {
                         paymasterServiceData: {
                             mode: PaymasterMode.SPONSORED
                         }
@@ -700,10 +705,25 @@
                         console.log("Transaction receipt:", receipt);
 
                         if (receipt.status === 1) {
+                            // Get the minted token ID from the event logs
+                            const mintEvent = receipt.logs
+                                .map(log => {
+                                    try {
+                                        return nftContract.interface.parseLog(log);
+                                    } catch (e) {
+                                        return null;
+                                    }
+                                })
+                                .find(event => event && event.name === 'Transfer');
+                            
+                            const tokenId = mintEvent ? mintEvent.args.tokenId.toString() : 'unknown';
+
                             transactionStatus.innerHTML = `
                                 <div class="text-green-600">
                                     ✅ NFT Minted Successfully!<br>
                                     Name: ${name}<br>
+                                    Collection: ${nftName} (${nftSymbol})<br>
+                                    Token ID: ${tokenId}<br>
                                     Price: ${price} ETH<br>
                                     ${collaborator ? `Collaborator: ${collaborator} (${royalty}%)` : ''}
                                 </div>
