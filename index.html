@@ -413,7 +413,7 @@
                 setupBtn.disabled = true;
 
                 smartWallet = await createSmartAccountClient({
-                    signer: CONFIG.privateKey,
+                    signer: wallet,
                     paymasterUrl: CONFIG.paymasterUrl,
                     bundlerUrl: CONFIG.bundlerUrl,
                     chainId: CONFIG.chainId
