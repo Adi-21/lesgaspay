@@ -601,7 +601,7 @@
 
         window.mintNFT = async function () {
             try {
-                if (!smartWallet || !window.walletPrivateKey) {
+                if (!smartWallet) {
                     throw new Error('Smart wallet not initialized. Please set up your smart account first.');
                 }
 
@@ -631,12 +631,12 @@
 
                 // Create contract interface
                 transactionStatus.textContent = 'Preparing transaction...';
-                const contract = new ethers.Contract(
-                    CONFIG.nftContractAddress,
-                    nftABI,
-                    smartWallet
-                );
-                const mintTx = await contract.populateTransaction.mintNFT(tokenURI);
+                // const contract = new ethers.Contract(
+                //     CONFIG.nftContractAddress,
+                //     nftABI,
+                //     smartWallet
+                // );
+                const mintTx = await nftInterface.populateTransaction.mintNFT(tokenURI);
 
                 try {
                     transactionStatus.textContent = 'Sending transaction...';
