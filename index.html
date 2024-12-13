@@ -412,10 +412,8 @@
                 const setupBtn = document.getElementById('setupBtn');
                 setupBtn.disabled = true;
 
-                const wallet = new ethers.Wallet(CONFIG.privateKey);
-
                 smartWallet = await createSmartAccountClient({
-                    signer: wallet,
+                    signer: CONFIG.privateKey,
                     paymasterUrl: CONFIG.paymasterUrl,
                     bundlerUrl: CONFIG.bundlerUrl,
                     chainId: CONFIG.chainId
