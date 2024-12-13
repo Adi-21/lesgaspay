@@ -596,14 +596,14 @@
                 // const nftSymbol = await nftContract.symbol();
                 // console.log(`Minting ${nftName} (${nftSymbol}) NFT...`);
 
-                const data = nftContract.encodeFunctionData("mintNFT", [tokenURI]);
+                const data = nftContract.interface.encodeFunctionData("mintNFT", [tokenURI]);
 
                 // Verify the encoded data
                 console.log("TokenURI:", tokenURI);
                 console.log("Encoded function data:", data);
 
                 // Decode the data to verify it's correct
-                const decodedData = nftContract.decodeFunctionData("mintNFT", data);
+                const decodedData = nftContract.interface.decodeFunctionData("mintNFT", data);
                 console.log("Decoded data:", decodedData);
                 if (decodedData[0] !== tokenURI) {
                     throw new Error("Function encoding verification failed");
