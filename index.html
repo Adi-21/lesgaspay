@@ -257,19 +257,20 @@
 
     <script type="module">
         import { createSmartAccountClient, PaymasterMode } from 'https://cdn.jsdelivr.net/npm/@0xgasless/smart-account@0.0.11/+esm';
+        import CONFIG from './config.json';
 
         // Update CONFIG to use environment variables
-        const CONFIG = {
-            rpcUrl: "https://avax-mainnet.g.alchemy.com/v2/VcifYAbO7TUL14eUvHmbjSklgVzWEMXk",
-            bundlerUrl: "https://bundler.0xgasless.com/43114",
-            paymasterUrl: "https://paymaster.0xgasless.com/v1/43114/rpc/35b99953-edde-4f28-9661-c41898916471",
-            chainId: 43114,
-            nftContractAddress: "0xe7337B97F380A19A860068f0dACa74F50AF86548",
-            pinata: {
-                jwt: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySW5mb3JtYXRpb24iOnsiaWQiOiIxOTc0ZWM3ZS1hNjk5LTQzM2QtODk1MS00YTEyMDcyOGY2MzkiLCJlbWFpbCI6ImFkaXMyMTEwNEBnbWFpbC5jb20iLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZSwicGluX3BvbGljeSI6eyJyZWdpb25zIjpbeyJkZXNpcmVkUmVwbGljYXRpb25Db3VudCI6MSwiaWQiOiJGUkExIn0seyJkZXNpcmVkUmVwbGljYXRpb25Db3VudCI6MSwiaWQiOiJOWUMxIn1dLCJ2ZXJzaW9uIjoxfSwibWZhX2VuYWJsZWQiOmZhbHNlLCJzdGF0dXMiOiJBQ1RJVkUifSwiYXV0aGVudGljYXRpb25UeXBlIjoic2NvcGVkS2V5Iiwic2NvcGVkS2V5S2V5IjoiNzhjOTM3NDMwNGMzYmRjNmYyYTciLCJzY29wZWRLZXlTZWNyZXQiOiIxYTUxMzAwY2ZhYWE2ZDY0M2JkOTYyMWIxNjA3ZmViYWUwNjQzMzA4NTk3Y2EyNDBhZTdjMzk3N2FmMDI0M2RhIiwiZXhwIjoxNzY1MjkwNDEwfQ.mGeY9zom2wbgZjlKHkrDQNisAKhv93-vk_X2D2mCZow",
-                apiEndpoint: 'https://api.pinata.cloud/pinning'
-            }
-        };
+        // const CONFIG = {
+        //     rpcUrl: "https://avax-mainnet.g.alchemy.com/v2/VcifYAbO7TUL14eUvHmbjSklgVzWEMXk",
+        //     bundlerUrl: "https://bundler.0xgasless.com/43114",
+        //     paymasterUrl: "https://paymaster.0xgasless.com/v1/43114/rpc/35b99953-edde-4f28-9661-c41898916471",
+        //     chainId: 43114,
+        //     nftContractAddress: "0xe7337B97F380A19A860068f0dACa74F50AF86548",
+        //     pinata: {
+        //         jwt: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySW5mb3JtYXRpb24iOnsiaWQiOiIxOTc0ZWM3ZS1hNjk5LTQzM2QtODk1MS00YTEyMDcyOGY2MzkiLCJlbWFpbCI6ImFkaXMyMTEwNEBnbWFpbC5jb20iLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZSwicGluX3BvbGljeSI6eyJyZWdpb25zIjpbeyJkZXNpcmVkUmVwbGljYXRpb25Db3VudCI6MSwiaWQiOiJGUkExIn0seyJkZXNpcmVkUmVwbGljYXRpb25Db3VudCI6MSwiaWQiOiJOWUMxIn1dLCJ2ZXJzaW9uIjoxfSwibWZhX2VuYWJsZWQiOmZhbHNlLCJzdGF0dXMiOiJBQ1RJVkUifSwiYXV0aGVudGljYXRpb25UeXBlIjoic2NvcGVkS2V5Iiwic2NvcGVkS2V5S2V5IjoiNzhjOTM3NDMwNGMzYmRjNmYyYTciLCJzY29wZWRLZXlTZWNyZXQiOiIxYTUxMzAwY2ZhYWE2ZDY0M2JkOTYyMWIxNjA3ZmViYWUwNjQzMzA4NTk3Y2EyNDBhZTdjMzk3N2FmMDI0M2RhIiwiZXhwIjoxNzY1MjkwNDEwfQ.mGeY9zom2wbgZjlKHkrDQNisAKhv93-vk_X2D2mCZow",
+        //         apiEndpoint: 'https://api.pinata.cloud/pinning'
+        //     }
+        // };
 
         let smartWallet;
         let provider;
@@ -312,7 +313,7 @@
             }
         };
 
-        window.importWallet = function() {
+        window.importWallet = function () {
 
             if (!window.telegramUser) {
                 alert('Please login with Telegram first');
@@ -323,8 +324,8 @@
             privateKeyInput.style.display = 'block';
             privateKeyInput.value = '';
             privateKeyInput.focus();
-            
-            privateKeyInput.onkeyup = async function(e) {
+
+            privateKeyInput.onkeyup = async function (e) {
                 if (e.key === 'Enter') {
                     try {
                         const privateKey = privateKeyInput.value.trim();
@@ -334,7 +335,7 @@
 
                         provider = new ethers.providers.JsonRpcProvider(CONFIG.rpcUrl);
                         wallet = new ethers.Wallet(privateKey, provider);
-                        
+
                         document.getElementById('walletInfo').innerHTML = `
                             <p><strong>EOA Address:</strong> ${wallet.address}</p>
                             <p><strong>Status:</strong> Wallet imported successfully!</p>
@@ -564,7 +565,7 @@
                 console.log("Using smart wallet:", smartWalletAddress);
 
                 const walletBalance = await provider.getBalance(smartWalletAddress);
-                console.log("Smart wallet balance:", ethers.utils.formatEther(walletBalance));          
+                console.log("Smart wallet balance:", ethers.utils.formatEther(walletBalance));
 
                 const mintBtn = document.getElementById('mintBtn');
                 mintBtn.disabled = true;
@@ -581,7 +582,7 @@
 
                 const transactionStatus = document.getElementById('transactionStatus');
                 const transactionHash = document.getElementById('transactionHash');
-                
+
                 if (!transactionStatus || !transactionHash) {
                     throw new Error('Required DOM elements not found');
                 }
@@ -624,7 +625,7 @@
 
                 try {
                     transactionStatus.textContent = 'Sending transaction...';
-                    
+
                     // Send the transaction
                     const userOpResponse = await smartWallet.sendTransaction(tx, {
                         paymasterServiceData: {
@@ -675,25 +676,26 @@
                     console.error('Transaction error:', txError);
                     throw new Error(`Transaction failed: ${txError.message}`);
                 }
-            } catch (error || txError) {
-                console.error('Transaction error:', txError);
+            } catch (error) {
+                console.error('Transaction error:', error);
+                const txError = error;  // Preserve the error for transaction-specific checks
+
                 if (txError.message.includes('user rejected')) {
                     throw new Error('Transaction was rejected');
                 } else if (txError.message.includes('insufficient funds')) {
                     throw new Error('Insufficient funds for transaction');
                 } else if (txError.message.includes('maximum duration')) {
-                    // Retry logic for timeout
                     throw new Error('Transaction took too long. Please try again');
                 } else {
-                    throw new Error(`Transaction failed: ${txError.message}`);
-                }
-                console.log("Minting error:", error);
-                if (transactionStatus) {
-                    transactionStatus.innerHTML = `
-                        <div class="text-red-600">
-                            ❌ Error: ${error.message}
-                        </div>
-                    `;
+                    console.log("Minting error:", error);
+                    if (transactionStatus) {
+                        transactionStatus.innerHTML = `
+                <div class="text-red-600">
+                    ❌ Error: ${error.message}
+                </div>
+            `;
+                    }
+                    throw new Error(`Transaction failed: ${error.message}`);
                 }
             } finally {
                 if (mintBtn) {
