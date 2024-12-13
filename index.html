@@ -635,9 +635,9 @@
 
                 // Get NFT contract information first
                 const nftContract = new ethers.Contract(CONFIG.nftContractAddress, nftABI, provider);
-                const nftName = await nftContract.name();
-                const nftSymbol = await nftContract.symbol();
-                console.log(`Minting ${nftName} (${nftSymbol}) NFT...`);
+                // const nftName = await nftContract.name();
+                // const nftSymbol = await nftContract.symbol();
+                // console.log(`Minting ${nftName} (${nftSymbol}) NFT...`);
 
                 // Create function interface and encode the mint function call
                 const nftInterface = new ethers.utils.Interface(nftABI);
@@ -653,7 +653,7 @@
 
                 try {
                     transactionStatus.textContent = 'Sending transaction...';
-                    transactionStatus.innerHTML = `Minting ${nftName} NFT...`;
+                    // transactionStatus.innerHTML = `Minting ${nftName} NFT...`;
                     
                     // Send the transaction
                     const userOpResponse = await smartWallet.sendTransaction(tx, {
@@ -721,8 +721,6 @@
                             transactionStatus.innerHTML = `
                                 <div class="text-green-600">
                                     ✅ NFT Minted Successfully!<br>
-                                    Name: ${name}<br>
-                                    Collection: ${nftName} (${nftSymbol})<br>
                                     Token ID: ${tokenId}<br>
                                     Price: ${price} ETH<br>
                                     ${collaborator ? `Collaborator: ${collaborator} (${royalty}%)` : ''}
