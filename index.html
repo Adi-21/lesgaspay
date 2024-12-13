@@ -535,51 +535,59 @@
 
         async function uploadToIPFS(metadata) {
             try {
-                // First upload the image
-                const imageElement = document.getElementById('artworkPreview');
-                const response = await fetch(imageElement.src);
-                const blob = await response.blob();
-
+                // First, upload the image to Pinata
+                const imageBlob = await fetch(document.getElementById('artworkPreview').src).then(r => r.blob());
                 const imageFormData = new FormData();
-                imageFormData.append('file', blob);
+                imageFormData.append('file', imageBlob, 'artwork.png');
 
-                const imageUploadRes = await fetch('https://api.pinata.cloud/pinning/pinFileToIPFS', {
+                const imageResponse = await fetch('https://api.pinata.cloud/pinning/pinFileToIPFS', {
                     method: 'POST',
                     headers: {
-                        'Authorization': `Bearer ${CONFIG.pinata.jwt}`
+                        'Authorization': `Bearer ${CONFIG.pinata.jwt}`,
+                        'Accept': 'application/json'
                     },
                     body: imageFormData
                 });
 
-                if (!imageUploadRes.ok) throw new Error('Failed to upload image');
-                const imageData = await imageUploadRes.json();
+                if (!imageResponse.ok) {
+                    const errorData = await imageResponse.json();
+                    console.error('Pinata Error:', errorData);
+                    throw new Error('Failed to upload image to IPFS');
+                }
 
-                // Update metadata with IPFS image URL
-                metadata.image = `ipfs://${imageData.IpfsHash}`;
+                const imageResult = await imageResponse.json();
+                const imageIPFSHash = imageResult.IpfsHash;
 
-                // Upload metadata
-                const metadataRes = await fetch('https://api.pinata.cloud/pinning/pinJSONToIPFS', {
+                // Update metadata with the IPFS image URL
+                metadata.image = `ipfs://${imageIPFSHash}`;
+
+                // Then upload the metadata JSON to Pinata
+                const metadataResponse = await fetch('https://api.pinata.cloud/pinning/pinJSONToIPFS', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${CONFIG.pinata.jwt}`
+                        'Authorization': `Bearer ${CONFIG.pinata.jwt}`,
+                        'Accept': 'application/json'
                     },
                     body: JSON.stringify(metadata)
                 });
 
-                if (!metadataRes.ok) throw new Error('Failed to upload metadata');
-                const metadataData = await metadataRes.json();
+                if (!metadataResponse.ok) {
+                    const errorData = await metadataResponse.json();
+                    console.error('Pinata Metadata Error:', errorData);
+                    throw new Error('Failed to upload metadata to IPFS');
+                }
 
-                return `ipfs://${metadataData.IpfsHash}`;
+                const metadataResult = await metadataResponse.json();
+                return `ipfs://${metadataResult.IpfsHash}`;
             } catch (error) {
-                console.error('IPFS Upload Error:', error);
-                throw error;
+                console.error('Error uploading to IPFS:', error);
+                throw new Error('Failed to upload to IPFS: ' + error.message);
             }
         }
 
         window.mintNFT = async function () {
             try {
-                const statusDiv = document.getElementById('statusText');
                 const mintBtn = document.getElementById('mintBtn');
                 mintBtn.disabled = true;
 
@@ -593,16 +601,17 @@
                     throw new Error('Please fill in all required fields');
                 }
 
-                statusDiv.style.display = 'block';
-                statusDiv.textContent = 'Uploading to IPFS...';
-
-                statusDiv.textContent = 'Preparing NFT metadata...';
+                const transactionStatus = document.getElementById('transactionStatus');
+                transactionStatus.style.display = 'block';
+                document.getElementById('statusText').textContent = 'Uploading to IPFS...';
 
                 // Create and upload metadata
                 const metadata = await createNFTMetadata(name, description);
                 const tokenURI = await uploadToIPFS(metadata);
 
-                // document.getElementById('statusText').textContent = 'Preparing to mint NFT...';
+                if (document.getElementById('statusText')) {
+                    document.getElementById('statusText').textContent = 'Preparing to mint NFT...';
+                }
 
                 // Create the mint transaction with the correct function name from the ABI
                 // const nftInterface = new ethers.utils.Interface(nftABI);
@@ -616,7 +625,7 @@
                 );
                 const data = nftInterface.encodeFunctionData("mintNFT", [tokenURI]);
 
-                statusDiv.textContent = 'Preparing transaction...';
+                transactionStatus.textContent = 'Preparing transaction...';
 
                 // const tx = {
                 //     to: CONFIG.nftContractAddress,
@@ -626,7 +635,7 @@
                 const mintTx = await nftInterface.populateTransaction.mintNFT(tokenURI);
 
                 try {
-                    statusDiv.textContent = 'Sending transaction...';
+                    transactionStatus.textContent = 'Sending transaction...';
                     // Send the transaction
                     const userOpResponse = await smartWallet.sendTransaction(tx, {
                         paymasterServiceData: {
@@ -636,7 +645,7 @@
                     console.log("userOpResponse are : ", userOpResponse);
                     console.log("userOpResponse.hash are : ", userOpResponse.hash);
 
-                    statusDiv.textContent = 'Minting in progress...';
+                    transactionStatus.textContent = 'Minting in progress...';
                     document.getElementById('transactionHash').innerHTML = `
                         Transaction Hash: <a href="https://subnets.avax.network/c-chain/tx/${userOpResponse.hash}" 
                         target="_blank" class="underline">${userOpResponse.hash}</a>
@@ -664,7 +673,7 @@
                     };
 
                     // Poll for receipt with status updates
-                    statusDiv.innerHTML = `
+                    transactionStatus.innerHTML = `
                         <div class="text-blue-600">
                             ⏳ Waiting for transaction confirmation...<br>
                             This may take a few minutes.
@@ -676,7 +685,7 @@
                         console.log("Transaction receipt:", receipt);
 
                         if (receipt.status === 1) {
-                            statusDiv.innerHTML = `
+                            transactionStatus.innerHTML = `
                                 <div class="text-green-600">
                                     ✅ NFT Minted Successfully!<br>
                                     Name: ${name}<br>
@@ -695,7 +704,7 @@
                         }
                     } catch (receiptError) {
                         // Handle timeout or receipt fetch error
-                        statusDiv.innerHTML = `
+                        transactionStatus.innerHTML = `
                             <div class="text-yellow-600">
                                 ⚠️ Transaction submitted but confirmation status unknown.<br>
                                 You can check the status using the transaction hash above.<br>
@@ -712,7 +721,7 @@
                 mintBtn.disabled = false;
             } catch (error) {
                 console.error("Minting error:", error);
-                statusDiv.innerHTML = `
+                transactionStatus.innerHTML = `
                     <div class="text-red-600">
                         ❌ Error: ${error.message}
                     </div>
