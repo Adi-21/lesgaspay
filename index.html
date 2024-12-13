@@ -123,13 +123,15 @@
 
         function updateLoginStatus(user) {
             const walletInfo = document.getElementById('walletInfo');
-            if (user) {
-                walletInfo.innerHTML = `
-                    <div class="flex items-center gap-2">
-                        <span>${user.first_name}</span>
-                    </div>
-                `;
-            }
+            // if (user) {
+            //     walletInfo.innerHTML = `
+            //         <div class="flex items-center gap-2">
+            //             <img src="${user.photo_url}" alt="${user.first_name}" 
+            //                 class="w-8 h-8 rounded-full">
+            //             <span>${user.first_name}</span>
+            //         </div>
+            //     `;
+            // }
         }
 
         // Check for existing Telegram login on page load
