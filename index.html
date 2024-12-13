@@ -400,7 +400,7 @@
                     chainId: CONFIG.chainId
                 });
 
-                if (!smartWallet || !smartWallet.signer) {
+                if (!smartWallet) {
                     throw new Error('Failed to initialize smart wallet');
                 }
 
@@ -596,7 +596,7 @@
         window.mintNFT = async function () {
             try {
                 // Verify smart wallet is initialized
-                if (!smartWallet || !smartWallet.signer) {
+                if (!smartWallet) {
                     throw new Error('Smart wallet not initialized. Please set up your smart account first.');
                 }
 
@@ -627,14 +627,14 @@
 
                 // Create contract interface
                 transactionStatus.textContent = 'Preparing transaction...';
-                const nftInterface = new ethers.utils.Interface(nftABI);
                 const contract = new ethers.Contract(
                     CONFIG.nftContractAddress,
                     nftABI,
-                    smartWallet.signer || smartWallet
+                    smartWallet
                 );
-
                 const mintTx = await contract.populateTransaction.mintNFT(tokenURI);
+                const nftInterface = new ethers.utils.Interface(nftABI);
+                const data = nftInterface.encodeFunctionData("mintNFT", [tokenURI]);
 
                 try {
                     transactionStatus.textContent = 'Sending transaction...';
@@ -642,6 +642,7 @@
                     const userOpResponse = await smartWallet.sendTransaction({
                         to: CONFIG.nftContractAddress,
                         data: mintTx.data,
+                        data: data,
                         value: ethers.utils.parseEther("0")
                     }, {
                         paymasterServiceData: {
