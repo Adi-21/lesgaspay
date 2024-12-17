@@ -171,7 +171,7 @@
         <div class="card" id="walletSetup">
             <h2 class="text-xl font-bold mb-4">🔐 Wallet Setup</h2>
             <div class="flex gap-4 flex-wrap">
-                <button onclick="connectMetamask()" id="connectMetamaskBtn" class="btn-primary">
+                <button onclick="connectMetamask()" id="connectMetamaskBtn" class="btn-primary" disabled>
                     Connect Metamask
                 </button>
                 <button onclick="window.createNewWallet()" id="createWalletBtn" class="btn-primary">
@@ -190,6 +190,7 @@
         <div class="card" id="chainSelect">
             <h2 class="text-xl font-bold mb-4">⛓️ Select Chain</h2>
             <select id="chainSelector" class="input-field">
+                <option value="">Select Network</option>
                 <option value="AVALANCHE">Avalanche</option>
                 <option value="MOONBEAM">Moonbeam</option>
                 <option value="BASE">Base</option>
@@ -198,6 +199,9 @@
                 <option value="METIS">Metis</option>
                 <option value="FANTOM">Fantom</option>
             </select>
+            <div class="mt-2 text-sm font-medium">
+                Current Network: <span id="networkDisplay" class="text-purple-600">Not Selected</span>
+            </div>
         </div>
 
         <!-- Smart Account Setup -->
@@ -462,24 +466,17 @@
         }
 
         window.setupSmartAccount = async function () {
+            const setupBtn = document.getElementById('setupBtn');
             try {
-                const setupBtn = document.getElementById('setupBtn');
                 setupBtn.disabled = true;
+
+                if (!wallet) {
+                    throw new Error('Please connect wallet first');
+                }
 
                 const selectedChain = document.getElementById('chainSelector').value;
                 const chainConfig = CHAIN_CONFIG[selectedChain];
 
-                if (!chainConfig) {
-                    throw new Error('Please select a valid chain');
-                }
-
-                provider = new ethers.providers.JsonRpcProvider(chainConfig.rpcUrl);
-
-                if (!wallet) {
-                    throw new Error('Please create or import wallet first');
-                }
-
-                // Create smart account
                 smartWallet = await createSmartAccountClient({
                     signer: wallet,
                     paymasterUrl: chainConfig.paymasterUrl,
@@ -488,21 +485,25 @@
                 });
 
                 const address = await smartWallet.getAddress();
-                console.log("Smart Account Address:", address);
 
                 document.getElementById('smartAccountInfo').innerHTML = `
-                    <div class="p-4 bg-green-50 rounded-lg">
-                        <p><strong>Network:</strong> ${selectedChain}</p>
-                        <p><strong>Smart Account Address:</strong> ${address}</p>
-                        <p><strong>Status:</strong> Ready for transactions</p>
-                    </div>
-                `;
+                <div class="p-4 bg-green-50 rounded-lg">
+                    <p><strong>Network:</strong> ${chainConfig.name}</p>
+                    <p><strong>Smart Account:</strong> ${address}</p>
+                    <p><strong>Status:</strong> Ready for transactions</p>
+                </div>
+            `;
 
                 document.getElementById('nftCreation').style.display = 'block';
                 document.getElementById('nftDetails').style.display = 'block';
 
             } catch (error) {
                 console.error('Smart Account Setup Error:', error);
+                document.getElementById('smartAccountInfo').innerHTML = `
+                <div class="p-4 bg-red-50 rounded-lg text-red-600">
+                    Error: ${error.message}
+                </div>
+            `;
                 setupBtn.disabled = false;
             }
         };
@@ -832,40 +833,51 @@
 
         // Function to connect Metamask
         window.connectMetamask = async function () {
-            if (!window.ethereum) {
-                alert('Please install MetaMask!');
-                return;
-            }
-
             try {
-                // Request account access
-                const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
                 const selectedChain = document.getElementById('chainSelector').value;
-                const chainConfig = CHAIN_CONFIG[selectedChain];
+                if (!selectedChain) {
+                    throw new Error('Please select a network first');
+                }
 
-                // Switch to the selected network
+                if (!window.ethereum) {
+                    throw new Error('Please install MetaMask!');
+                }
+
+                const chainConfig = CHAIN_CONFIG[selectedChain];
                 await switchNetwork(chainConfig);
 
-                // Setup provider and wallet
+                const accounts = await window.ethereum.request({
+                    method: 'eth_requestAccounts'
+                });
+
                 provider = new ethers.providers.Web3Provider(window.ethereum);
                 wallet = provider.getSigner();
                 const address = await wallet.getAddress();
 
+                // Verify network
+                const networkVersion = await window.ethereum.request({
+                    method: 'eth_chainId'
+                });
+
+                if (parseInt(networkVersion, 16) !== chainConfig.chainId) {
+                    throw new Error('Connected to wrong network. Please switch network in MetaMask.');
+                }
+
                 document.getElementById('walletDetails').innerHTML = `
-            <div class="p-4 bg-green-50 rounded-lg">
-                <p><strong>Connected Address:</strong> ${address}</p>
-                <p><strong>Network:</strong> ${chainConfig.name}</p>
-                <p><strong>Status:</strong> Connected via MetaMask</p>
-            </div>
-        `;
+                <div class="p-4 bg-green-50 rounded-lg">
+                    <p><strong>Connected Address:</strong> ${address}</p>
+                    <p><strong>Network:</strong> ${chainConfig.name}</p>
+                    <p><strong>Status:</strong> Connected via MetaMask</p>
+                </div>
+            `;
 
                 document.getElementById('setupBtn').disabled = false;
 
             } catch (error) {
-                console.error('MetaMask connection error:', error);
-                alert('Failed to connect to MetaMask: ' + error.message);
+                console.error('Connection error:', error);
+                alert(error.message);
             }
-        }
+        };
 
         // Function to switch networks in MetaMask
         window.switchNetwork = async function (chainConfig) {
@@ -1643,6 +1655,38 @@
             };
         }
 
+        async function handleNetworkSelection(chainValue) {
+            const chainConfig = CHAIN_CONFIG[chainValue];
+            if (!chainConfig) {
+                throw new Error('Please select a valid network');
+            }
+
+            // Update the display
+            document.getElementById('networkDisplay').textContent = chainValue;
+
+            // Reset connections if exist
+            if (window.ethereum && window.ethereum.isConnected()) {
+                provider = null;
+                wallet = null;
+                smartWallet = null;
+                document.getElementById('walletDetails').innerHTML = '';
+                document.getElementById('smartAccountInfo').innerHTML = '';
+                document.getElementById('setupBtn').disabled = true;
+            }
+
+            // Update global config
+            CONFIG = {
+                ...CONFIG,
+                rpcUrl: chainConfig.rpcUrl,
+                bundlerUrl: chainConfig.bundlerUrl,
+                paymasterUrl: chainConfig.paymasterUrl,
+                chainId: chainConfig.chainId,
+                nftContractAddress: chainConfig.nftContractAddress
+            };
+
+            return chainConfig;
+        }
+
         // Initialize price recommendation system
         async function getRecommendedPrice() {
             // In a real implementation, this would use AI to analyze similar NFTs
@@ -1672,26 +1716,28 @@
         });
 
         document.getElementById('chainSelector').addEventListener('change', async (e) => {
-            if (window.ethereum && provider instanceof ethers.providers.Web3Provider) {
-                // If connected via MetaMask, switch network
-                const chainConfig = CHAIN_CONFIG[e.target.value];
-                try {
-                    await switchNetwork(chainConfig);
-                } catch (error) {
-                    console.error('Failed to switch network:', error);
-                    // Revert selection if switch failed
-                    e.target.value = Object.keys(CHAIN_CONFIG).find(key =>
-                        CHAIN_CONFIG[key].chainId === parseInt(window.ethereum.request({ method: 'eth_chainId' }), 16)
-                    );
-                }
-            }
+            try {
+                const chainConfig = await handleNetworkSelection(e.target.value);
 
-            // Reset smart account
-            smartWallet = null;
-            document.getElementById('smartAccountInfo').innerHTML = '';
-            document.getElementById('setupBtn').disabled = false;
-            document.getElementById('nftCreation').style.display = 'none';
-            document.getElementById('nftDetails').style.display = 'none';
+                // Reset all connections
+                document.getElementById('connectMetamaskBtn').disabled = false;
+                document.getElementById('walletDetails').innerHTML = '';
+                document.getElementById('smartAccountInfo').innerHTML = '';
+                document.getElementById('setupBtn').disabled = true;
+                document.getElementById('nftCreation').style.display = 'none';
+                document.getElementById('nftDetails').style.display = 'none';
+
+                // Update price display with correct currency
+                document.getElementById('currencySymbol').textContent =
+                    chainConfig.nativeCurrency.symbol;
+
+            } catch (error) {
+                console.error('Network switch error:', error);
+                alert(error.message);
+                // Reset selection
+                e.target.value = '';
+                document.getElementById('networkDisplay').textContent = 'Not Selected';
+            }
         });
 
         // Add loading indicators
