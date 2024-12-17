@@ -160,7 +160,7 @@
                     <script async src="https://telegram.org/js/telegram-widget.js?22"
                         data-telegram-login="cheesecakeverify_bot" data-size="medium" data-onauth="onTelegramAuth(user)"
                         data-request-access="write">
-                    </script>
+                        </script>
                 </div>
             </div>
         </div>
@@ -171,6 +171,9 @@
         <div class="card" id="walletSetup">
             <h2 class="text-xl font-bold mb-4">🔐 Wallet Setup</h2>
             <div class="flex gap-4 flex-wrap">
+                <button onclick="connectMetamask()" id="connectMetamaskBtn" class="btn-primary">
+                    Connect Metamask
+                </button>
                 <button onclick="window.createNewWallet()" id="createWalletBtn" class="btn-primary">
                     Create New Wallet
                 </button>
@@ -181,6 +184,20 @@
             <input type="text" id="privateKey" placeholder="Enter your private key (with 0x prefix)"
                 class="input-field mt-4" style="display: none;">
             <div id="walletDetails" class="mt-4 text-sm text-gray-600"></div>
+        </div>
+
+        <!-- Add this after wallet setup card -->
+        <div class="card" id="chainSelect">
+            <h2 class="text-xl font-bold mb-4">⛓️ Select Chain</h2>
+            <select id="chainSelector" class="input-field">
+                <option value="AVALANCHE">Avalanche</option>
+                <option value="MOONBEAM">Moonbeam</option>
+                <option value="BASE">Base</option>
+                <option value="ETHEREUM">Ethereum</option>
+                <option value="POLYGON">Polygon</option>
+                <option value="METIS">Metis</option>
+                <option value="FANTOM">Fantom</option>
+            </select>
         </div>
 
         <!-- Smart Account Setup -->
@@ -227,7 +244,8 @@
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                 <div>
-                    <label class="block text-sm font-medium mb-2">💰 Base Price (ETH)</label>
+                    <label class="block text-sm font-medium mb-2">💰 Base Price</label>
+                    <span class="text-xs text-gray-500" id="currencySymbol"></span>
                     <input type="number" id="basePrice" placeholder="0.0" step="0.001" min="0" class="input-field">
                     <p id="priceRecommendation" class="text-sm text-purple-600"></p>
                 </div>
@@ -268,6 +286,100 @@
             pinata: {
                 jwt: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySW5mb3JtYXRpb24iOnsiaWQiOiIxOTc0ZWM3ZS1hNjk5LTQzM2QtODk1MS00YTEyMDcyOGY2MzkiLCJlbWFpbCI6ImFkaXMyMTEwNEBnbWFpbC5jb20iLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZSwicGluX3BvbGljeSI6eyJyZWdpb25zIjpbeyJkZXNpcmVkUmVwbGljYXRpb25Db3VudCI6MSwiaWQiOiJGUkExIn0seyJkZXNpcmVkUmVwbGljYXRpb25Db3VudCI6MSwiaWQiOiJOWUMxIn1dLCJ2ZXJzaW9uIjoxfSwibWZhX2VuYWJsZWQiOmZhbHNlLCJzdGF0dXMiOiJBQ1RJVkUifSwiYXV0aGVudGljYXRpb25UeXBlIjoic2NvcGVkS2V5Iiwic2NvcGVkS2V5S2V5IjoiNzhjOTM3NDMwNGMzYmRjNmYyYTciLCJzY29wZWRLZXlTZWNyZXQiOiIxYTUxMzAwY2ZhYWE2ZDY0M2JkOTYyMWIxNjA3ZmViYWUwNjQzMzA4NTk3Y2EyNDBhZTdjMzk3N2FmMDI0M2RhIiwiZXhwIjoxNzY1MjkwNDEwfQ.mGeY9zom2wbgZjlKHkrDQNisAKhv93-vk_X2D2mCZow",
                 apiEndpoint: 'https://api.pinata.cloud/pinning'
+            }
+        };
+
+        const CHAIN_CONFIG = {
+            MOONBEAM: {
+                chainId: 1284,
+                rpcUrl: "https://moonbeam-rpc.publicnode.com",
+                bundlerUrl: "https://bundler.0xgasless.com/8780429",
+                paymasterUrl: "YOUR_PAYMASTER_URL",
+                nftContractAddress: "YOUR_MOONBEAM_CONTRACT",
+                explorerUrl: "https://moonbeam.moonscan.io/tx/",
+                nativeCurrency: {
+                    name: "GLMR",
+                    symbol: "GLMR",
+                    decimals: 18
+                }
+            },
+            BASE: {
+                chainId: 8453,
+                rpcUrl: "https://base-rpc.publicnode.com",
+                bundlerUrl: "https://bundler.0xgasless.com/23821278",
+                paymasterUrl: "YOUR_PAYMASTER_URL",
+                nftContractAddress: "YOUR_BASE_CONTRACT",
+                explorerUrl: "https://basescan.org/tx/",
+                nativeCurrency: {
+                    name: "ETH",
+                    symbol: "ETH",
+                    decimals: 18
+                }
+            },
+            AVALANCHE: {
+                chainId: 43114,
+                rpcUrl: "https://avalanche-c-chain-rpc.publicnode.com",
+                bundlerUrl: "https://bundler.0xgasless.com/43114",
+                paymasterUrl: "https://paymaster.0xgasless.com/v1/43114/rpc/35b99953-edde-4f28-9661-c41898916471",
+                nftContractAddress: "0xe7337B97F380A19A860068f0dACa74F50AF86548",
+                explorerUrl: "https://subnets.avax.network/c-chain/tx/",
+                nativeCurrency: {
+                    name: "AVAX",
+                    symbol: "AVAX",
+                    decimals: 18
+                }
+            },
+            ETHEREUM: {
+                chainId: 1,
+                rpcUrl: "https://ethereum-rpc.publicnode.com",
+                bundlerUrl: "https://bundler.0xgasless.com/1",
+                paymasterUrl: "YOUR_PAYMASTER_URL",
+                nftContractAddress: "YOUR_ETHEREUM_CONTRACT",
+                explorerUrl: "https://etherscan.io/tx/",
+                nativeCurrency: {
+                    name: "ETH",
+                    symbol: "ETH",
+                    decimals: 18
+                }
+            },
+            POLYGON: {
+                chainId: 137,
+                rpcUrl: "https://polygon-bor-rpc.publicnode.com",
+                bundlerUrl: "https://bundler.0xgasless.com/137",
+                paymasterUrl: "YOUR_PAYMASTER_URL",
+                nftContractAddress: "YOUR_POLYGON_CONTRACT",
+                explorerUrl: "https://polygonscan.com/tx/",
+                nativeCurrency: {
+                    name: "POL",
+                    symbol: "POL",
+                    decimals: 18
+                }
+            },
+            METIS: {
+                chainId: 1088,
+                rpcUrl: "https://metis-mainnet.public.blastapi.io",
+                bundlerUrl: "https://bundler.0xgasless.com/1088",
+                paymasterUrl: "YOUR_PAYMASTER_URL",
+                nftContractAddress: "YOUR_METIS_CONTRACT",
+                explorerUrl: "https://andromeda.explorer.metis.io/tx/",
+                nativeCurrency: {
+                    name: "METIS",
+                    symbol: "METIS",
+                    decimals: 18
+                }
+            },
+            FANTOM: {
+                chainId: 250,
+                rpcUrl: "https://fantom-rpc.publicnode.com",
+                bundlerUrl: "https://bundler.0xgasless.com/250",
+                paymasterUrl: "YOUR_PAYMASTER_URL",
+                nftContractAddress: "YOUR_FANTOM_CONTRACT",
+                explorerUrl: "https://ftmscan.com/tx/",
+                nativeCurrency: {
+                    name: "FTM",
+                    symbol: "FTM",
+                    decimals: 18
+                }
             }
         };
 
@@ -354,33 +466,38 @@
                 const setupBtn = document.getElementById('setupBtn');
                 setupBtn.disabled = true;
 
-                provider = new ethers.providers.JsonRpcProvider(CONFIG.rpcUrl);
+                const selectedChain = document.getElementById('chainSelector').value;
+                const chainConfig = CHAIN_CONFIG[selectedChain];
 
-                // Create wallet from signer (this is your EOA wallet)
+                if (!chainConfig) {
+                    throw new Error('Please select a valid chain');
+                }
+
+                provider = new ethers.providers.JsonRpcProvider(chainConfig.rpcUrl);
+
                 if (!wallet) {
                     throw new Error('Please create or import wallet first');
                 }
 
                 // Create smart account
                 smartWallet = await createSmartAccountClient({
-                    signer: wallet, // This is your EOA that will sign transactions
-                    paymasterUrl: CONFIG.paymasterUrl,
-                    bundlerUrl: CONFIG.bundlerUrl,
-                    chainId: CONFIG.chainId
+                    signer: wallet,
+                    paymasterUrl: chainConfig.paymasterUrl,
+                    bundlerUrl: chainConfig.bundlerUrl,
+                    chainId: chainConfig.chainId
                 });
 
-                // Verify smart account
                 const address = await smartWallet.getAddress();
                 console.log("Smart Account Address:", address);
 
                 document.getElementById('smartAccountInfo').innerHTML = `
-                    <div class="p-4 bg-green-50 rounded-lg">
-                        <p><strong>Smart Account Address:</strong> ${address}</p>
-                        <p><strong>Status:</strong> Ready for transactions</p>
-                    </div>
-                `;
+            <div class="p-4 bg-green-50 rounded-lg">
+                <p><strong>Network:</strong> ${selectedChain}</p>
+                <p><strong>Smart Account Address:</strong> ${address}</p>
+                <p><strong>Status:</strong> Ready for transactions</p>
+            </div>
+        `;
 
-                // Enable NFT minting UI
                 document.getElementById('nftCreation').style.display = 'block';
                 document.getElementById('nftDetails').style.display = 'block';
 
@@ -632,9 +749,9 @@
 
                     transactionStatus.textContent = 'Minting in progress...';
                     transactionHash.innerHTML = `
-                Transaction Hash: <a href="https://subnets.avax.network/c-chain/tx/${txHash}" 
-                target="_blank" class="underline">${txHash}</a>
-            `;
+                        Transaction Hash: <a href="${getExplorerUrl(txHash)}" 
+                        target="_blank" class="underline">${txHash}</a>
+                    `;
 
                     // Wait for confirmation
                     statusText.textContent = 'Waiting for confirmation...';
@@ -712,6 +829,94 @@
                 }
             }
         };
+
+        // Function to connect Metamask
+        async function connectMetamask() {
+            if (!window.ethereum) {
+                alert('Please install MetaMask!');
+                return;
+            }
+
+            try {
+                // Request account access
+                const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+                const selectedChain = document.getElementById('chainSelector').value;
+                const chainConfig = CHAIN_CONFIG[selectedChain];
+
+                // Switch to the selected network
+                await switchNetwork(chainConfig);
+
+                // Setup provider and wallet
+                provider = new ethers.providers.Web3Provider(window.ethereum);
+                wallet = provider.getSigner();
+                const address = await wallet.getAddress();
+
+                document.getElementById('walletDetails').innerHTML = `
+            <div class="p-4 bg-green-50 rounded-lg">
+                <p><strong>Connected Address:</strong> ${address}</p>
+                <p><strong>Network:</strong> ${chainConfig.name}</p>
+                <p><strong>Status:</strong> Connected via MetaMask</p>
+            </div>
+        `;
+
+                document.getElementById('setupBtn').disabled = false;
+
+            } catch (error) {
+                console.error('MetaMask connection error:', error);
+                alert('Failed to connect to MetaMask: ' + error.message);
+            }
+        }
+
+        // Function to switch networks in MetaMask
+        async function switchNetwork(chainConfig) {
+            try {
+                await window.ethereum.request({
+                    method: 'wallet_switchEthereumChain',
+                    params: [{ chainId: ethers.utils.hexValue(chainConfig.chainId) }],
+                });
+            } catch (switchError) {
+                // This error code indicates that the chain has not been added to MetaMask
+                if (switchError.code === 4902) {
+                    try {
+                        await window.ethereum.request({
+                            method: 'wallet_addEthereumChain',
+                            params: [
+                                {
+                                    chainId: ethers.utils.hexValue(chainConfig.chainId),
+                                    chainName: chainConfig.name,
+                                    rpcUrls: [chainConfig.rpcUrl],
+                                    nativeCurrency: chainConfig.nativeCurrency,
+                                    blockExplorerUrls: [chainConfig.explorerUrl.split('/tx/')[0]]
+                                }
+                            ],
+                        });
+                    } catch (addError) {
+                        console.error('Failed to add network:', addError);
+                        throw addError;
+                    }
+                } else {
+                    throw switchError;
+                }
+            }
+        }
+
+        // Add network change listener
+        if (window.ethereum) {
+            window.ethereum.on('chainChanged', (chainId) => {
+                // Reload page when chain changes
+                window.location.reload();
+            });
+
+            window.ethereum.on('accountsChanged', (accounts) => {
+                if (accounts.length === 0) {
+                    // Handle disconnection
+                    provider = null;
+                    wallet = null;
+                    document.getElementById('walletDetails').innerHTML = '';
+                    document.getElementById('setupBtn').disabled = true;
+                }
+            });
+        }
 
         // NFT Contract ABI
         const nftABI = [
@@ -1463,7 +1668,30 @@
                 e.target.style.borderColor = '#ef4444';
             } else {
                 e.target.style.borderColor = '#e5e7eb';
+            } 1
+        });
+
+        document.getElementById('chainSelector').addEventListener('change', async (e) => {
+            if (window.ethereum && provider instanceof ethers.providers.Web3Provider) {
+                // If connected via MetaMask, switch network
+                const chainConfig = CHAIN_CONFIG[e.target.value];
+                try {
+                    await switchNetwork(chainConfig);
+                } catch (error) {
+                    console.error('Failed to switch network:', error);
+                    // Revert selection if switch failed
+                    e.target.value = Object.keys(CHAIN_CONFIG).find(key =>
+                        CHAIN_CONFIG[key].chainId === parseInt(window.ethereum.request({ method: 'eth_chainId' }), 16)
+                    );
+                }
             }
+
+            // Reset smart account
+            smartWallet = null;
+            document.getElementById('smartAccountInfo').innerHTML = '';
+            document.getElementById('setupBtn').disabled = false;
+            document.getElementById('nftCreation').style.display = 'none';
+            document.getElementById('nftDetails').style.display = 'none';
         });
 
         // Add loading indicators
@@ -1474,6 +1702,12 @@
             } else {
                 element.classList.remove('loading');
             }
+        }
+
+        function getExplorerUrl(txHash) {
+            const selectedChain = document.getElementById('chainSelector').value;
+            const chainConfig = CHAIN_CONFIG[selectedChain];
+            return `${chainConfig.explorerUrl}${txHash}`;
         }
 
         // Initialize tooltips
