@@ -436,7 +436,11 @@
                 return account;
             } catch (error) {
                 console.error('Connection error:', error);
-                alert(error.message);
+                document.getElementById('walletDetails').innerHTML = `
+            <div class="p-4 bg-red-50 rounded-lg text-red-600">
+                Error: ${error.message}
+            </div>
+        `;
                 throw error;
             }
         };
@@ -1716,16 +1720,15 @@
             } 1
         });
 
-        document.getElementById('chainSelector').addEventListener('change', debounce(async (e) => {
+        document.getElementById('chainSelector').addEventListener('change', async function (e) {
             try {
                 const chainValue = e.target.value;
+                const connectMetamaskBtn = document.getElementById('connectMetamaskBtn');
                 const networkDisplay = document.getElementById('networkDisplay');
 
                 // Immediate UI feedback
-                requestAnimationFrame(() => {
-                    networkDisplay.textContent = chainValue || 'Not Selected';
-                    document.getElementById('connectMetamaskBtn').disabled = !chainValue;
-                });
+                connectMetamaskBtn.disabled = !chainValue;
+                networkDisplay.textContent = chainValue || 'Not Selected';
 
                 if (!chainValue) {
                     return;
@@ -1736,7 +1739,7 @@
                     throw new Error('Invalid network configuration');
                 }
 
-                // Update CONFIG object
+                // Update CONFIG
                 CONFIG = {
                     ...CONFIG,
                     rpcUrl: chainConfig.rpcUrl,
@@ -1746,54 +1749,29 @@
                     nftContractAddress: chainConfig.nftContractAddress
                 };
 
-                // Update UI elements
-                requestAnimationFrame(() => {
-                    // Update currency symbol
-                    const currencySymbol = document.getElementById('currencySymbol');
-                    if (currencySymbol) {
-                        currencySymbol.textContent = chainConfig.nativeCurrency.symbol;
-                    }
+                // Reset wallet states if already connected
+                if (window.ethereum?.isConnected()) {
+                    provider = null;
+                    wallet = null;
+                    smartWallet = null;
+                    document.getElementById('walletDetails').innerHTML = '';
+                    document.getElementById('smartAccountInfo').innerHTML = '';
+                    document.getElementById('setupBtn').disabled = true;
+                }
 
-                    // Reset wallet states if connected
-                    if (window.ethereum?.isConnected()) {
-                        provider = null;
-                        wallet = null;
-                        smartWallet = null;
-
-                        // Reset UI elements
-                        const elements = {
-                            walletDetails: { innerHTML: '' },
-                            smartAccountInfo: { innerHTML: '' },
-                            setupBtn: { disabled: true },
-                            nftCreation: { style: { display: 'none' } },
-                            nftDetails: { style: { display: 'none' } }
-                        };
-
-                        Object.entries(elements).forEach(([id, props]) => {
-                            const element = document.getElementById(id);
-                            if (element) {
-                                Object.entries(props).forEach(([prop, value]) => {
-                                    if (prop === 'style') {
-                                        Object.assign(element.style, value);
-                                    } else {
-                                        element[prop] = value;
-                                    }
-                                });
-                            }
-                        });
-                    }
+                console.log('Network updated:', {
+                    chain: chainValue,
+                    config: CONFIG
                 });
 
             } catch (error) {
                 console.error('Network switch error:', error);
-                requestAnimationFrame(() => {
-                    e.target.value = '';
-                    networkDisplay.textContent = 'Not Selected';
-                    document.getElementById('connectMetamaskBtn').disabled = true;
-                    alert(error.message);
-                });
+                e.target.value = '';
+                networkDisplay.textContent = 'Not Selected';
+                connectMetamaskBtn.disabled = true;
+                alert(error.message);
             }
-        }, 250));
+        });
 
         // Add loading indicators
         function setLoading(elementId, isLoading) {
