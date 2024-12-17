@@ -831,7 +831,7 @@
         };
 
         // Function to connect Metamask
-        async function connectMetamask() {
+        window.connectMetamask = async function () {
             if (!window.ethereum) {
                 alert('Please install MetaMask!');
                 return;
@@ -868,7 +868,7 @@
         }
 
         // Function to switch networks in MetaMask
-        async function switchNetwork(chainConfig) {
+        window.switchNetwork = async function (chainConfig) {
             try {
                 await window.ethereum.request({
                     method: 'wallet_switchEthereumChain',
