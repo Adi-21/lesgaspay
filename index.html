@@ -167,6 +167,24 @@
     </nav>
 
     <main class="container mx-auto px-4 max-w-4xl">
+
+        <div class="card" id="chainSelect">
+            <h2 class="text-xl font-bold mb-4">⛓️ Select Chain</h2>
+            <select id="chainSelector" class="input-field">
+                <option value="">Select Network</option>
+                <option value="AVALANCHE">Avalanche</option>
+                <option value="MOONBEAM">Moonbeam</option>
+                <option value="BASE">Base</option>
+                <option value="ETHEREUM">Ethereum</option>
+                <option value="POLYGON">Polygon</option>
+                <option value="METIS">Metis</option>
+                <option value="FANTOM">Fantom</option>
+            </select>
+            <div class="mt-2 text-sm font-medium">
+                Current Network: <span id="networkDisplay" class="text-purple-600">Not Selected</span>
+            </div>
+        </div>
+        
         <!-- Wallet Setup -->
         <div class="card" id="walletSetup">
             <h2 class="text-xl font-bold mb-4">🔐 Wallet Setup</h2>
@@ -184,24 +202,6 @@
             <input type="text" id="privateKey" placeholder="Enter your private key (with 0x prefix)"
                 class="input-field mt-4" style="display: none;">
             <div id="walletDetails" class="mt-4 text-sm text-gray-600"></div>
-        </div>
-
-        <!-- Add this after wallet setup card -->
-        <div class="card" id="chainSelect">
-            <h2 class="text-xl font-bold mb-4">⛓️ Select Chain</h2>
-            <select id="chainSelector" class="input-field">
-                <option value="">Select Network</option>
-                <option value="AVALANCHE">Avalanche</option>
-                <option value="MOONBEAM">Moonbeam</option>
-                <option value="BASE">Base</option>
-                <option value="ETHEREUM">Ethereum</option>
-                <option value="POLYGON">Polygon</option>
-                <option value="METIS">Metis</option>
-                <option value="FANTOM">Fantom</option>
-            </select>
-            <div class="mt-2 text-sm font-medium">
-                Current Network: <span id="networkDisplay" class="text-purple-600">Not Selected</span>
-            </div>
         </div>
 
         <!-- Smart Account Setup -->
@@ -1655,37 +1655,37 @@
             };
         }
 
-        async function handleNetworkSelection(chainValue) {
-            const chainConfig = CHAIN_CONFIG[chainValue];
-            if (!chainConfig) {
-                throw new Error('Please select a valid network');
-            }
+        // async function handleNetworkSelection(chainValue) {
+        //     const chainConfig = CHAIN_CONFIG[chainValue];
+        //     if (!chainConfig) {
+        //         throw new Error('Please select a valid network');
+        //     }
 
-            // Update the display
-            document.getElementById('networkDisplay').textContent = chainValue;
+        //     // Update the display
+        //     document.getElementById('networkDisplay').textContent = chainValue;
 
-            // Reset connections if exist
-            if (window.ethereum && window.ethereum.isConnected()) {
-                provider = null;
-                wallet = null;
-                smartWallet = null;
-                document.getElementById('walletDetails').innerHTML = '';
-                document.getElementById('smartAccountInfo').innerHTML = '';
-                document.getElementById('setupBtn').disabled = true;
-            }
+        //     // Reset connections if exist
+        //     if (window.ethereum && window.ethereum.isConnected()) {
+        //         provider = null;
+        //         wallet = null;
+        //         smartWallet = null;
+        //         document.getElementById('walletDetails').innerHTML = '';
+        //         document.getElementById('smartAccountInfo').innerHTML = '';
+        //         document.getElementById('setupBtn').disabled = true;
+        //     }
 
-            // Update global config
-            CONFIG = {
-                ...CONFIG,
-                rpcUrl: chainConfig.rpcUrl,
-                bundlerUrl: chainConfig.bundlerUrl,
-                paymasterUrl: chainConfig.paymasterUrl,
-                chainId: chainConfig.chainId,
-                nftContractAddress: chainConfig.nftContractAddress
-            };
+        //     // Update global config
+        //     CONFIG = {
+        //         ...CONFIG,
+        //         rpcUrl: chainConfig.rpcUrl,
+        //         bundlerUrl: chainConfig.bundlerUrl,
+        //         paymasterUrl: chainConfig.paymasterUrl,
+        //         chainId: chainConfig.chainId,
+        //         nftContractAddress: chainConfig.nftContractAddress
+        //     };
 
-            return chainConfig;
-        }
+        //     return chainConfig;
+        // }
 
         // Initialize price recommendation system
         async function getRecommendedPrice() {
@@ -1717,26 +1717,74 @@
 
         document.getElementById('chainSelector').addEventListener('change', async (e) => {
             try {
-                const chainConfig = await handleNetworkSelection(e.target.value);
+                const chainValue = e.target.value;
+                const networkDisplay = document.getElementById('networkDisplay');
+                const connectMetamaskBtn = document.getElementById('connectMetamaskBtn');
+                const currencySymbol = document.getElementById('currencySymbol');
+                
+                // Update display immediately
+                networkDisplay.textContent = chainValue || 'Not Selected';
+                
+                if (!chainValue) {
+                    throw new Error('Please select a valid network');
+                }
 
-                // Reset all connections
-                document.getElementById('connectMetamaskBtn').disabled = false;
-                document.getElementById('walletDetails').innerHTML = '';
-                document.getElementById('smartAccountInfo').innerHTML = '';
-                document.getElementById('setupBtn').disabled = true;
-                document.getElementById('nftCreation').style.display = 'none';
-                document.getElementById('nftDetails').style.display = 'none';
+                const chainConfig = CHAIN_CONFIG[chainValue];
+                if (!chainConfig) {
+                    throw new Error('Invalid network configuration');
+                }
 
-                // Update price display with correct currency
-                document.getElementById('currencySymbol').textContent =
-                    chainConfig.nativeCurrency.symbol;
+                // Update UI elements
+                connectMetamaskBtn.disabled = false;
+                currencySymbol.textContent = chainConfig.nativeCurrency.symbol;
+
+                // Reset wallet states
+                if (window.ethereum?.isConnected()) {
+                    provider = null;
+                    wallet = null;
+                    smartWallet = null;
+                }
+
+                // Batch DOM updates
+                const updates = {
+                    'walletDetails': '',
+                    'smartAccountInfo': '',
+                    'setupBtn': true,
+                    'nftCreation': 'none',
+                    'nftDetails': 'none'
+                };
+
+                // Apply updates in a single frame
+                requestAnimationFrame(() => {
+                    Object.entries(updates).forEach(([id, value]) => {
+                        const element = document.getElementById(id);
+                        if (element) {
+                            if (typeof value === 'boolean') {
+                                element.disabled = value;
+                            } else if (value === 'none') {
+                                element.style.display = 'none';
+                            } else {
+                                element.innerHTML = value;
+                            }
+                        }
+                    });
+                });
+
+                // Update global config
+                CONFIG = {
+                    ...CONFIG,
+                    rpcUrl: chainConfig.rpcUrl,
+                    bundlerUrl: chainConfig.bundlerUrl,
+                    paymasterUrl: chainConfig.paymasterUrl,
+                    chainId: chainConfig.chainId,
+                    nftContractAddress: chainConfig.nftContractAddress
+                };
 
             } catch (error) {
                 console.error('Network switch error:', error);
-                alert(error.message);
-                // Reset selection
                 e.target.value = '';
                 document.getElementById('networkDisplay').textContent = 'Not Selected';
+                alert(error.message);
             }
         });
 
