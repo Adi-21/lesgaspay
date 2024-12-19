@@ -854,7 +854,7 @@
                     console.log("Transaction submitted:", userOpResponse);
 
                     // Wait for transaction hash
-                    const txHash = await userOpResponse.waitForTxHash();
+                    const txHash = await userOpResponse.wait();
                     console.log("Transaction hash received:", txHash);
 
                     if (!txHash) {
