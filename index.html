@@ -478,21 +478,30 @@
             }
         }
 
-        // Add network change listener
+        // Update MetaMask event listeners
         if (window.ethereum) {
-            window.ethereum.on('chainChanged', (chainId) => {
-                // Reload page when chain changes
+            window.ethereum.on('chainChanged', (_chainId) => {
+                console.log('Chain changed:', _chainId);
                 window.location.reload();
             });
 
             window.ethereum.on('accountsChanged', (accounts) => {
+                console.log('Accounts changed:', accounts);
                 if (accounts.length === 0) {
-                    // Handle disconnection
+                    // User disconnected
                     provider = null;
                     wallet = null;
                     document.getElementById('walletDetails').innerHTML = '';
                     document.getElementById('setupBtn').disabled = true;
                 }
+            });
+
+            window.ethereum.on('connect', (connectInfo) => {
+                console.log('MetaMask connected:', connectInfo);
+            });
+
+            window.ethereum.on('disconnect', (error) => {
+                console.log('MetaMask disconnected:', error);
             });
         }
 
@@ -1749,8 +1758,8 @@
                     nftContractAddress: chainConfig.nftContractAddress
                 };
 
-                // Reset wallet states if already connected
-                if (window.ethereum?.isConnected()) {
+                // Reset wallet states if MetaMask is connected
+                if (window.ethereum && window.ethereum.selectedAddress) {
                     provider = null;
                     wallet = null;
                     smartWallet = null;
@@ -1815,6 +1824,26 @@
                 console.log('Feedback received:', message);
             }
         };
+
+        // Add this helper function
+        function isMetaMaskConnected() {
+            return window.ethereum && window.ethereum.selectedAddress !== null;
+        }
+
+        // You can use this function to check connection status
+        async function checkMetaMaskConnection() {
+            if (!window.ethereum) {
+                return false;
+            }
+            
+            try {
+                const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+                return accounts.length > 0;
+            } catch (error) {
+                console.error('Error checking MetaMask connection:', error);
+                return false;
+            }
+        }
 
     </script>
 
