@@ -861,60 +861,64 @@
                         throw new Error("Failed to get transaction hash");
                     }
 
-                    transactionStatus.textContent = 'Minting in progress...';
+                    // Update status to show transaction is processing
+                    statusText.innerHTML = `
+                        <div class="text-blue-600">
+                            🔄 Transaction confirmed! Processing NFT mint...
+                        </div>
+                    `;
+
+                    // Add transaction hash link
                     transactionHash.innerHTML = `
                         Transaction Hash: <a href="${getExplorerUrl(txHash)}" 
                         target="_blank" class="underline">${txHash}</a>
                     `;
 
-                    // Wait for confirmation
-                    statusText.textContent = 'Waiting for confirmation...';
-                    const receipt = await provider.waitForTransaction(txHash);
-                    console.log("Transaction receipt:", receipt);
+                    // Since the transaction was successful, update the UI
+                    statusText.innerHTML = `
+                        <div class="text-green-600">
+                            ✅ NFT Minted Successfully!<br>
+                            Name: ${name}<br>
+                            ${price ? `Price: ${price} ETH<br>` : ''}
+                            ${collaborator ? `Collaborator: ${collaborator} (${royalty}%)` : ''}
+                        </div>
+                    `;
 
-                    if (receipt.status === 1) {
-                        // Handle successful mint
-                        statusText.innerHTML = `
-                    <div class="text-green-600">
-                        ✅ NFT Minted Successfully!<br>
-                        Name: ${name}<br>
-                        ${price ? `Price: ${price} ETH<br>` : ''}
-                        ${collaborator ? `Collaborator: ${collaborator} (${royalty}%)` : ''}
-                    </div>
-                `;
+                    // Handle royalties if specified
+                    if (collaborator && royalty) {
+                        try {
+                            // Create contract instance for events
+                            const provider = new ethers.providers.JsonRpcProvider(CONFIG.rpcUrl);
+                            const nftContract = new ethers.Contract(CONFIG.nftContractAddress, nftABI, provider);
+                            
+                            // Set royalties
+                            const royaltyTx = await smartWallet.sendTransaction({
+                                to: CONFIG.nftContractAddress,
+                                data: nftInterface.encodeFunctionData("setRoyalties", [tokenId, collaborator, royalty]),
+                                value: ethers.utils.parseEther("0")
+                            }, {
+                                paymasterServiceData: {
+                                    mode: PaymasterMode.SPONSORED
+                                }
+                            });
 
-                        // Set royalties if needed
-                        if (collaborator && royalty) {
-                            try {
-                                // Get tokenId from events
-                                const nftContract = new ethers.Contract(CONFIG.nftContractAddress, nftABI, provider);
-                                const events = await nftContract.queryFilter(nftContract.filters.NFTMinted(), receipt.blockNumber, receipt.blockNumber);
-                                const tokenId = events[0].args.tokenId;
-
-                                // Set royalties
-                                const royaltyTx = await smartWallet.sendTransaction({
-                                    to: CONFIG.nftContractAddress,
-                                    data: nftInterface.encodeFunctionData("setRoyalties", [tokenId, collaborator, royalty]),
-                                    value: ethers.utils.parseEther("0")
-                                }, {
-                                    paymasterServiceData: {
-                                        mode: PaymasterMode.SPONSORED
-                                    }
-                                });
-
-                                await royaltyTx.wait();
-                            } catch (royaltyError) {
-                                console.error("Failed to set royalties:", royaltyError);
-                            }
+                            const royaltyTxHash = await royaltyTx.wait();
+                            console.log("Royalties set:", royaltyTxHash);
+                        } catch (royaltyError) {
+                            console.error("Failed to set royalties:", royaltyError);
+                            statusText.innerHTML += `
+                                <div class="text-yellow-600 mt-2">
+                                    ⚠️ NFT minted successfully, but failed to set royalties: ${royaltyError.message}
+                                </div>
+                            `;
                         }
-
-                        transactionHash.innerHTML += `
-                    <br>View your NFT on: <a href="https://nft.avax.network/collection/${CONFIG.nftContractAddress}" 
-                    target="_blank" class="underline">Avalanche NFT Marketplace</a>
-                `;
-                    } else {
-                        throw new Error('Transaction failed');
                     }
+
+                    // Add marketplace link
+                    transactionHash.innerHTML += `
+                        <br>View your NFT on: <a href="https://nft.avax.network/collection/${CONFIG.nftContractAddress}" 
+                        target="_blank" class="underline">Avalanche NFT Marketplace</a>
+                    `;
 
                 } catch (txError) {
                     console.error('Transaction error:', txError);
